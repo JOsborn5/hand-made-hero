@@ -28,13 +28,13 @@ global_variable win32_offscreen_buffer globalBackBuffer;
 
 
 internal void
-RenderWeirdGradient(win32_offscreen_buffer buffer, int xOffset, int yOffset)
+RenderWeirdGradient(win32_offscreen_buffer *buffer, int xOffset, int yOffset)
 {
-	uint8_t *row = (uint8_t *) buffer.memory;
-	for(int Y = 0; Y < buffer.height; Y++)
+	uint8_t *row = (uint8_t *) buffer->memory;
+	for(int Y = 0; Y < buffer->height; Y++)
 	{
 		uint8_t *pixel = (uint8_t *)row;
-		for(int X = 0; X < buffer.width; X++)
+		for(int X = 0; X < buffer->width; X++)
 		{
 			/*
 				pixel in memory: BB GG RR xx
@@ -51,7 +51,7 @@ RenderWeirdGradient(win32_offscreen_buffer buffer, int xOffset, int yOffset)
 			pixel++;
 
 			//RED
-			*pixel = (uint8_t)(buffer.width - X + xOffset);
+			*pixel = (uint8_t)(buffer->width - X + xOffset);
 			pixel++;
 
 			// PADDING BYTE
@@ -59,22 +59,22 @@ RenderWeirdGradient(win32_offscreen_buffer buffer, int xOffset, int yOffset)
 			pixel++;
 			
 		}
-		row += buffer.pitch;
+		row += buffer->pitch;
 	}
 }
 
 
 internal void
 // Note this changes the buffer so we're passing the buffer as a pointer so this function will update it
-Win32_ResizeDIBSection(win32_offscreen_buffer *buffer, win32_window_dimension window)
+Win32_ResizeDIBSection(win32_offscreen_buffer *buffer, int width, int height)
 {
 	if(buffer->memory)
 	{
 		VirtualFree(buffer->memory, 0, MEM_RELEASE);
 	}
 
-	buffer->width = window.width;
-	buffer->height = window.height;
+	buffer->width = width;
+	buffer->height = height;
 
 	buffer->info.bmiHeader.biSize = sizeof(buffer->info.bmiHeader);
 	buffer->info.bmiHeader.biWidth = buffer->width;
@@ -103,13 +103,13 @@ Win32_GetWindowDimension(HWND window)
 }
 
 internal void
-Win32_DisplayBufferInWindow(HDC deviceContext, win32_window_dimension window, win32_offscreen_buffer buffer)
+Win32_DisplayBufferInWindow(HDC deviceContext, int width, int height, win32_offscreen_buffer *buffer)
 {
 	StretchDIBits(deviceContext,
-		0, 0, window.width, window.height,
-		0, 0, buffer.width, buffer.height,
-		buffer.memory,
-		&buffer.info,
+		0, 0, width, height,
+		0, 0, buffer->width, buffer->height,
+		buffer->memory,
+		&buffer->info,
 		DIB_RGB_COLORS,
 		SRCCOPY);
 }
@@ -126,8 +126,7 @@ Win32_MainWindowCallback(HWND window,
 	{
 		case WM_SIZE:
 		{
-			win32_window_dimension windowSize = Win32_GetWindowDimension(window);
-			Win32_ResizeDIBSection(&globalBackBuffer, windowSize);
+
 		} break;
 		case WM_DESTROY:
 		{
@@ -137,12 +136,48 @@ Win32_MainWindowCallback(HWND window,
 		{
 			isRunning = false;
 		} break;
+		case WM_SYSKEYDOWN:
+		case WM_SYSKEYUP:
+		case WM_KEYDOWN:
+		case WM_KEYUP:
+		{
+			uint32_t vKCode = wParam;
+			bool wasDown = (lParam & (1 << 30) != 0); // Bit #30 of the LParam tells us what the previous key was
+			bool isDown = (lParam & (1 << 30) == 0); // Bit #31 of the LParam tells us what the current key is
+			if(wasDown != isDown)
+			{
+				if(vKCode == VK_UP)
+				{
+
+				}
+				else if (vKCode == VK_DOWN)
+				{
+
+				}
+				else if (vKCode == VK_LEFT)
+				{
+
+				}
+				else if (vKCode == VK_RIGHT)
+				{
+
+				}
+				else if (vKCode == VK_ESCAPE)
+				{
+
+				}
+				else if (vKCode == VK_SPACE)
+				{
+
+				}
+			}
+		} break;
 		case WM_PAINT:
 		{
 			PAINTSTRUCT paint;
 			HDC deviceContext = BeginPaint(window, &paint);
 			win32_window_dimension windowSize = Win32_GetWindowDimension(window);
-			Win32_DisplayBufferInWindow(deviceContext, windowSize, globalBackBuffer);
+			Win32_DisplayBufferInWindow(deviceContext, windowSize.width, windowSize.height, &globalBackBuffer);
 			EndPaint(window, &paint);
 		} break;
 		default:
@@ -161,11 +196,13 @@ WinMain(HINSTANCE instance,
 		LPSTR commandLine,
 		int showCode)
 {
-	WNDCLASS windowClass = {};
+	WNDCLASSA windowClass = {};
 	windowClass.style = CS_OWNDC|CS_HREDRAW|CS_VREDRAW;
 	windowClass.lpfnWndProc = Win32_MainWindowCallback;
 	windowClass.hInstance = instance;
 	windowClass.lpszClassName = "Fucking A!";
+
+	Win32_ResizeDIBSection(&globalBackBuffer, 1200, 700);
 
 	if(RegisterClass(&windowClass))
 	{
@@ -201,11 +238,11 @@ WinMain(HINSTANCE instance,
 					DispatchMessage(&message);
 				}
 
-				RenderWeirdGradient(globalBackBuffer, xOffset, yOffset);
+				RenderWeirdGradient(&globalBackBuffer, xOffset, yOffset);
 
 				win32_window_dimension windowSize = Win32_GetWindowDimension(window);
 				HDC deviceContext = GetDC(window);
-				Win32_DisplayBufferInWindow(deviceContext, windowSize, globalBackBuffer);
+				Win32_DisplayBufferInWindow(deviceContext, windowSize.width, windowSize.height, &globalBackBuffer);
 				ReleaseDC(window, deviceContext);
 
 				xOffset += 1;

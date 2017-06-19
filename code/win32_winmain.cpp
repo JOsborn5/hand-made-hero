@@ -1,8 +1,14 @@
 #include <windows.h>
 #include <stdint.h>
+#include <dsound.h>
 
 #define internal static
 #define global_variable static
+
+// Macro:
+#define DIRECT_SOUND_CREATE(name) HRESULT WINAPI name(LPCGUID pcGuidDevice, LPDIRECTSOUND *ppDS, LPUNKNOWN pUnkOuter)
+// Pointer to our macro:
+typedef DIRECT_SOUND_CREATE(direct_sound_create);
 
 // Stuff for our RGB display buffer
 struct win32_offscreen_buffer
@@ -23,9 +29,6 @@ struct win32_window_dimension
 
 global_variable bool isRunning = false;
 global_variable win32_offscreen_buffer globalBackBuffer;
-
-
-
 
 internal void
 RenderWeirdGradient(win32_offscreen_buffer *buffer, int xOffset, int yOffset)
@@ -88,6 +91,69 @@ Win32_ResizeDIBSection(win32_offscreen_buffer *buffer, int width, int height)
 	buffer->memory = VirtualAlloc(0, bitmapMemorySize, MEM_COMMIT, PAGE_READWRITE);
 }
 
+internal void
+Win32_InitDirectSound(HWND window, int32_t samplesPerSecond, int32_t bufferSize)
+{
+	// Load the library
+	HMODULE DirectSoundLibrary = LoadLibraryA("dsound.dll");
+
+	if(DirectSoundLibrary)
+	{
+		direct_sound_create *DirectSoundCreate = (direct_sound_create *)
+			GetProcAddress(DirectSoundLibrary, "DirectSoundCreate");
+		LPDIRECTSOUND directSound;
+		if(DirectSoundCreate && SUCCEEDED(DirectSoundCreate(0, &directSound, 0)))
+		{
+			WAVEFORMATEX waveFormat = {};
+			waveFormat.wFormatTag = WAVE_FORMAT_PCM;
+			waveFormat.nChannels = 2;
+			waveFormat.nSamplesPerSec = samplesPerSecond;
+			waveFormat.nBlockAlign = (waveFormat.nChannels * waveFormat.wBitsPerSample) / 8;
+			waveFormat.nAvgBytesPerSec = waveFormat.nSamplesPerSec * waveFormat.nBlockAlign;
+			waveFormat.wBitsPerSample = 16;
+			waveFormat.cbSize;
+
+			if(SUCCEEDED(directSound->SetCooperativeLevel(window, DSSCL_PRIORITY)))
+			{
+				// clear the buffer memory space to zero
+				DSBUFFERDESC bufferDescription = {};
+				bufferDescription.dwSize = sizeof(bufferDescription);
+				bufferDescription.dwFlags = DSBCAPS_PRIMARYBUFFER;
+				LPDIRECTSOUNDBUFFER primaryBuffer;
+				if(SUCCEEDED(directSound->CreateSoundBuffer(&bufferDescription, &primaryBuffer, 0)))
+				{
+					if(SUCCEEDED(primaryBuffer->SetFormat(&waveFormat)))
+					{
+						// we have finally set the format!
+					}
+				}
+			}
+
+			DSBUFFERDESC bufferDescription = {};
+			bufferDescription.dwSize = sizeof(bufferDescription);
+			bufferDescription.dwFlags = 0;
+			bufferDescription.dwBufferBytes = bufferSize;
+			bufferDescription.lpwfxFormat = &waveFormat;
+			LPDIRECTSOUNDBUFFER secondaryBuffer;
+			if(SUCCEEDED(directSound->CreateSoundBuffer(&bufferDescription, &secondaryBuffer, 0)))
+			{
+				// Start playing sound!
+			}
+
+			// Create a primary sound buffer
+
+			// Create a secondary buffer (2 sec duration that we write to)
+			bufferDescription.dwBufferBytes = bufferSize;
+
+			// Start playing
+		}
+		else
+		{
+			// disagnostics
+		}
+	}
+}
+
 win32_window_dimension
 Win32_GetWindowDimension(HWND window)
 {
@@ -142,8 +208,8 @@ Win32_MainWindowCallback(HWND window,
 		case WM_KEYUP:
 		{
 			uint32_t vKCode = wParam;
-			bool wasDown = (lParam & (1 << 30) != 0); // Bit #30 of the LParam tells us what the previous key was
-			bool isDown = (lParam & (1 << 30) == 0); // Bit #31 of the LParam tells us what the current key is
+			bool wasDown = ((lParam & (1 << 30)) != 0); // Bit #30 of the LParam tells us what the previous key was
+			bool isDown = ((lParam & (1 << 30)) == 0); // Bit #31 of the LParam tells us what the current key is
 			if(wasDown != isDown)
 			{
 				if(vKCode == VK_UP)
@@ -170,6 +236,12 @@ Win32_MainWindowCallback(HWND window,
 				{
 
 				}
+			}
+
+			bool altKeyDown = ((lParam & (1 << 29)) != 0);
+			if((vKCode == VK_F4) && altKeyDown)
+			{
+				isRunning = false;
 			}
 		} break;
 		case WM_PAINT:
@@ -225,6 +297,9 @@ WinMain(HINSTANCE instance,
 			isRunning = true;
 			int xOffset = 0;
 			int yOffset = 0;
+
+			Win32_InitDirectSound(window, 48000, 48000 * sizeof(int16_t) * 2);
+
 			while(isRunning)
 			{
 				// flush the queue of messages from windows in this loop

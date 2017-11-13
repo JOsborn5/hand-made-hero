@@ -29,6 +29,7 @@ struct win32_window_dimension
 
 global_variable bool isRunning = false;
 global_variable win32_offscreen_buffer globalBackBuffer;
+global_variable LPDIRECTSOUNDBUFFER globalSoundBuffer;
 
 internal void
 RenderWeirdGradient(win32_offscreen_buffer *buffer, int xOffset, int yOffset)
@@ -101,6 +102,7 @@ Win32_InitDirectSound(HWND window, int32_t samplesPerSecond, int32_t bufferSize)
 	{
 		direct_sound_create *DirectSoundCreate = (direct_sound_create *)
 			GetProcAddress(DirectSoundLibrary, "DirectSoundCreate");
+
 		LPDIRECTSOUND directSound;
 		if(DirectSoundCreate && SUCCEEDED(DirectSoundCreate(0, &directSound, 0)))
 		{
@@ -111,7 +113,7 @@ Win32_InitDirectSound(HWND window, int32_t samplesPerSecond, int32_t bufferSize)
 			waveFormat.nBlockAlign = (waveFormat.nChannels * waveFormat.wBitsPerSample) / 8;
 			waveFormat.nAvgBytesPerSec = waveFormat.nSamplesPerSec * waveFormat.nBlockAlign;
 			waveFormat.wBitsPerSample = 16;
-			waveFormat.cbSize;
+			waveFormat.cbSize = 0;
 
 			if(SUCCEEDED(directSound->SetCooperativeLevel(window, DSSCL_PRIORITY)))
 			{
@@ -119,11 +121,14 @@ Win32_InitDirectSound(HWND window, int32_t samplesPerSecond, int32_t bufferSize)
 				DSBUFFERDESC bufferDescription = {};
 				bufferDescription.dwSize = sizeof(bufferDescription);
 				bufferDescription.dwFlags = DSBCAPS_PRIMARYBUFFER;
+
 				LPDIRECTSOUNDBUFFER primaryBuffer;
 				if(SUCCEEDED(directSound->CreateSoundBuffer(&bufferDescription, &primaryBuffer, 0)))
 				{
-					if(SUCCEEDED(primaryBuffer->SetFormat(&waveFormat)))
+					HRESULT error = primaryBuffer->SetFormat(&waveFormat);
+					if(SUCCEEDED(error))
 					{
+						OutputDebugStringA("Primary buffer format was set.\n");
 						// we have finally set the format!
 					}
 				}
@@ -134,13 +139,12 @@ Win32_InitDirectSound(HWND window, int32_t samplesPerSecond, int32_t bufferSize)
 			bufferDescription.dwFlags = 0;
 			bufferDescription.dwBufferBytes = bufferSize;
 			bufferDescription.lpwfxFormat = &waveFormat;
-			LPDIRECTSOUNDBUFFER secondaryBuffer;
-			if(SUCCEEDED(directSound->CreateSoundBuffer(&bufferDescription, &secondaryBuffer, 0)))
+			
+			HRESULT error = directSound->CreateSoundBuffer(&bufferDescription, &globalSoundBuffer, 0);
+			if(SUCCEEDED(error))
 			{
-				// Start playing sound!
+				OutputDebugStringA("Secondary sound buffer created successfully.\n");
 			}
-
-			// Create a primary sound buffer
 
 			// Create a secondary buffer (2 sec duration that we write to)
 			bufferDescription.dwBufferBytes = bufferSize;
@@ -298,7 +302,18 @@ WinMain(HINSTANCE instance,
 			int xOffset = 0;
 			int yOffset = 0;
 
-			Win32_InitDirectSound(window, 48000, 48000 * sizeof(int16_t) * 2);
+			const int samplesPerSecond = 48000;
+			int toneHz = 256;
+			int toneVolume = 500;
+			uint32_t runningSampleIndex = 0; // unsigned because we want this to loop back to zero once it hits its max
+			//int squareWaveCounter = 0;
+			int squareWavePeriod = samplesPerSecond / toneHz;
+			int halfSquareWavePeriod = squareWavePeriod / 2;
+			int bytesPerSample = sizeof(int16_t) * 2;
+			int soundBufferSize = samplesPerSecond * bytesPerSample;
+
+			Win32_InitDirectSound(window, samplesPerSecond, soundBufferSize);
+			globalSoundBuffer->Play(0, 0, DS8PLAY_LOOPING);
 
 			while(isRunning)
 			{
@@ -314,6 +329,70 @@ WinMain(HINSTANCE instance,
 				}
 
 				RenderWeirdGradient(&globalBackBuffer, xOffset, yOffset);
+
+				// Direct sound output test
+				// Lock direct sound buffer
+				DWORD playCursor;
+				DWORD writeCursor;
+				if(SUCCEEDED(globalSoundBuffer->GetCurrentPosition(
+					&playCursor,
+					&writeCursor
+				)))
+				{
+					DWORD byteToLock = (runningSampleIndex * bytesPerSample) % soundBufferSize;
+					DWORD bytesToWrite;
+					if(byteToLock > playCursor)	// write cursor is ahead of the play cursor in the circular buffer.
+												// So we want to write from the write cursor to the end of the buffer, plsu from the start of the buffer to the play cursor.
+					{
+						bytesToWrite = soundBufferSize - byteToLock;
+						bytesToWrite += playCursor;
+					}
+					else // play cursor is ahead of the write cursor, so we want to write from write cursor to the play cursor
+					{
+						bytesToWrite = playCursor - byteToLock;
+					}
+					VOID *region1;
+					DWORD region1Size;
+					VOID *region2;
+					DWORD region2Size;
+
+					HRESULT gotLock = SUCCEEDED(globalSoundBuffer->Lock(
+						byteToLock,
+						bytesToWrite,
+						&region1, &region1Size,
+						&region2, &region2Size,
+						0
+					));
+					if(gotLock)
+					{
+						// TODO: Assert region1Size is valid
+						DWORD region1SampleCount = region1Size / bytesPerSample;
+						int16_t *sampleOut = (int16_t *)region1;
+						for(DWORD sampleIndex = 0;
+							sampleIndex < region1SampleCount;
+							++sampleIndex)
+						{
+							int16_t sampleValue = ((runningSampleIndex / halfSquareWavePeriod) % 2) ? toneVolume : -toneVolume;
+							*sampleOut++ = sampleValue; // writes the sampleValue to the buffer
+							*sampleOut++ = sampleValue;
+							++runningSampleIndex;
+						}
+
+						DWORD region2SampleCount = region2Size / bytesPerSample;
+						sampleOut = (int16_t *)region2;
+						for(DWORD sampleIndex = 0;
+							sampleIndex < region2SampleCount;
+							++sampleIndex)
+						{
+							int16_t sampleValue = ((runningSampleIndex / halfSquareWavePeriod) % 2) ? toneVolume : -toneVolume;
+							*sampleOut++ = sampleValue; // writes the sampleValue to the buffer
+							*sampleOut++ = sampleValue;
+							++runningSampleIndex;
+						}
+
+						globalSoundBuffer->Unlock(region1, region1Size, region2, region2Size);
+					}
+				}
 
 				win32_window_dimension windowSize = Win32_GetWindowDimension(window);
 				HDC deviceContext = GetDC(window);

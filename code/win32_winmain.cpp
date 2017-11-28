@@ -109,11 +109,11 @@ Win32_InitDirectSound(HWND window, int32_t samplesPerSecond, int32_t bufferSize)
 			WAVEFORMATEX waveFormat = {};
 			waveFormat.wFormatTag = WAVE_FORMAT_PCM;
 			waveFormat.nChannels = 2;
+			waveFormat.wBitsPerSample = 16;
+			waveFormat.cbSize = 0;
 			waveFormat.nSamplesPerSec = samplesPerSecond;
 			waveFormat.nBlockAlign = (waveFormat.nChannels * waveFormat.wBitsPerSample) / 8;
 			waveFormat.nAvgBytesPerSec = waveFormat.nSamplesPerSec * waveFormat.nBlockAlign;
-			waveFormat.wBitsPerSample = 16;
-			waveFormat.cbSize = 0;
 
 			if(SUCCEEDED(directSound->SetCooperativeLevel(window, DSSCL_PRIORITY)))
 			{
@@ -313,7 +313,7 @@ WinMain(HINSTANCE instance,
 			int soundBufferSize = samplesPerSecond * bytesPerSample;
 
 			Win32_InitDirectSound(window, samplesPerSecond, soundBufferSize);
-			globalSoundBuffer->Play(0, 0, DS8PLAY_LOOPING);
+			globalSoundBuffer->Play(0, 0, DSBPLAY_LOOPING);
 
 			while(isRunning)
 			{

@@ -1,9 +1,12 @@
 #include <windows.h>
 #include <stdint.h>
 #include <dsound.h>
+#include <math.h>
 
 #define internal static
 #define global_variable static
+
+#define Pi32 3.14159265359f
 
 // Macro:
 #define DIRECT_SOUND_CREATE(name) HRESULT WINAPI name(LPCGUID pcGuidDevice, LPDIRECTSOUND *ppDS, LPUNKNOWN pUnkOuter)
@@ -306,14 +309,11 @@ WinMain(HINSTANCE instance,
 			int toneHz = 256;
 			int toneVolume = 500;
 			uint32_t runningSampleIndex = 0; // unsigned because we want this to loop back to zero once it hits its max
-			//int squareWaveCounter = 0;
-			int squareWavePeriod = samplesPerSecond / toneHz;
-			int halfSquareWavePeriod = squareWavePeriod / 2;
+			int wavePeriod = samplesPerSecond / toneHz;
 			int bytesPerSample = sizeof(int16_t) * 2;
 			int soundBufferSize = samplesPerSecond * bytesPerSample;
 
 			Win32_InitDirectSound(window, samplesPerSecond, soundBufferSize);
-			globalSoundBuffer->Play(0, 0, DSBPLAY_LOOPING);
 
 			while(isRunning)
 			{
@@ -334,15 +334,17 @@ WinMain(HINSTANCE instance,
 				// Lock direct sound buffer
 				DWORD playCursor;
 				DWORD writeCursor;
-				if(SUCCEEDED(globalSoundBuffer->GetCurrentPosition(
-					&playCursor,
-					&writeCursor
-				)))
+				bool soundIsPlaying = false;
+				if(SUCCEEDED(globalSoundBuffer->GetCurrentPosition(&playCursor, &writeCursor)))
 				{
 					DWORD byteToLock = (runningSampleIndex * bytesPerSample) % soundBufferSize;
 					DWORD bytesToWrite;
-					if(byteToLock > playCursor)	// write cursor is ahead of the play cursor in the circular buffer.
-												// So we want to write from the write cursor to the end of the buffer, plsu from the start of the buffer to the play cursor.
+					if(byteToLock == playCursor)	// If nothing has been played.
+					{
+						bytesToWrite = soundBufferSize;
+					}
+					else if(byteToLock > playCursor)	// write cursor is ahead of the play cursor in the circular buffer.
+														// So we want to write from the write cursor to the end of the buffer, plsu from the start of the buffer to the play cursor.
 					{
 						bytesToWrite = soundBufferSize - byteToLock;
 						bytesToWrite += playCursor;
@@ -372,7 +374,9 @@ WinMain(HINSTANCE instance,
 							sampleIndex < region1SampleCount;
 							++sampleIndex)
 						{
-							int16_t sampleValue = ((runningSampleIndex / halfSquareWavePeriod) % 2) ? toneVolume : -toneVolume;
+							float t = 2.0f * Pi32 * ((float)runningSampleIndex / (float)wavePeriod); // where we are in the sin period
+							float sineValue = sinf(t);
+							int16_t sampleValue = (int16_t)(sineValue * toneVolume);
 							*sampleOut++ = sampleValue; // writes the sampleValue to the buffer
 							*sampleOut++ = sampleValue;
 							++runningSampleIndex;
@@ -384,7 +388,9 @@ WinMain(HINSTANCE instance,
 							sampleIndex < region2SampleCount;
 							++sampleIndex)
 						{
-							int16_t sampleValue = ((runningSampleIndex / halfSquareWavePeriod) % 2) ? toneVolume : -toneVolume;
+							float t = 2.0f * Pi32 * ((float)runningSampleIndex / (float)wavePeriod); // where we are in the sin period
+							float sineValue = sinf(t);
+							int16_t sampleValue = (int16_t)(sineValue * toneVolume);
 							*sampleOut++ = sampleValue; // writes the sampleValue to the buffer
 							*sampleOut++ = sampleValue;
 							++runningSampleIndex;
@@ -392,6 +398,12 @@ WinMain(HINSTANCE instance,
 
 						globalSoundBuffer->Unlock(region1, region1Size, region2, region2Size);
 					}
+				}
+
+				if(!soundIsPlaying)
+				{
+					globalSoundBuffer->Play(0, 0, DSBPLAY_LOOPING);
+					soundIsPlaying = true;
 				}
 
 				win32_window_dimension windowSize = Win32_GetWindowDimension(window);

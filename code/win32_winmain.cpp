@@ -269,6 +269,67 @@ Win32_MainWindowCallback(HWND window,
 	return result;
 }
 
+struct win32_sound_output
+{
+	int samplesPerSecond;
+	int toneHz;
+	int toneVolume;
+	uint32_t runningSampleIndex; // unsigned because we want this to loop back to zero once it hits its max
+	int wavePeriod;
+	int bytesPerSample;
+	int soundBufferSize;
+	float tSine;
+};
+
+void Win32FillSoundBuffer(win32_sound_output *soundOutput, DWORD byteToLock, DWORD bytesToWrite)
+{
+	VOID *region1;
+	DWORD region1Size;
+	VOID *region2;
+	DWORD region2Size;
+
+	HRESULT gotLock = SUCCEEDED(globalSoundBuffer->Lock(
+		byteToLock,
+		bytesToWrite,
+		&region1, &region1Size,
+		&region2, &region2Size,
+		0
+	));
+	if(gotLock)
+	{
+		// TODO: Assert region1Size is valid
+		DWORD region1SampleCount = region1Size / soundOutput->bytesPerSample;
+		int16_t *sampleOut = (int16_t *)region1;
+		for(DWORD sampleIndex = 0;
+			sampleIndex < region1SampleCount;
+			++sampleIndex)
+		{
+			float sineValue = sinf(soundOutput->tSine);
+			int16_t sampleValue = (int16_t)(sineValue * soundOutput->toneVolume);
+			*sampleOut++ = sampleValue; // writes the sampleValue to the buffer
+			*sampleOut++ = sampleValue;
+			soundOutput->tSine += 2.0f * Pi32 * 1.0f/(float)soundOutput->wavePeriod;
+			++soundOutput->runningSampleIndex;
+		}
+
+		DWORD region2SampleCount = region2Size / soundOutput->bytesPerSample;
+		sampleOut = (int16_t *)region2;
+		for(DWORD sampleIndex = 0;
+			sampleIndex < region2SampleCount;
+			++sampleIndex)
+		{
+			float sineValue = sinf(soundOutput->tSine);
+			int16_t sampleValue = (int16_t)(sineValue * soundOutput->toneVolume);
+			*sampleOut++ = sampleValue; // writes the sampleValue to the buffer
+			*sampleOut++ = sampleValue;
+			soundOutput->tSine += 2.0f * Pi32 * 1.0f/(float)soundOutput->wavePeriod;
+			++soundOutput->runningSampleIndex;
+		}
+
+		globalSoundBuffer->Unlock(region1, region1Size, region2, region2Size);
+	}
+}
+
 int CALLBACK
 WinMain(HINSTANCE instance,
 		HINSTANCE prevInstance,
@@ -305,15 +366,19 @@ WinMain(HINSTANCE instance,
 			int xOffset = 0;
 			int yOffset = 0;
 
-			const int samplesPerSecond = 48000;
-			int toneHz = 256;
-			int toneVolume = 500;
-			uint32_t runningSampleIndex = 0; // unsigned because we want this to loop back to zero once it hits its max
-			int wavePeriod = samplesPerSecond / toneHz;
-			int bytesPerSample = sizeof(int16_t) * 2;
-			int soundBufferSize = samplesPerSecond * bytesPerSample;
+			win32_sound_output soundOutput = {};
+		
+			soundOutput.samplesPerSecond = 48000;
+			soundOutput.toneHz = 256;
+			soundOutput.toneVolume = 500;
+			soundOutput.runningSampleIndex = 0; // unsigned because we want this to loop back to zero once it hits its max
+			soundOutput.wavePeriod = soundOutput.samplesPerSecond / soundOutput.toneHz;
+			soundOutput.bytesPerSample = sizeof(int16_t) * 2;
+			soundOutput.soundBufferSize = soundOutput.samplesPerSecond * soundOutput.bytesPerSample;
 
-			Win32_InitDirectSound(window, samplesPerSecond, soundBufferSize);
+			Win32_InitDirectSound(window, soundOutput.samplesPerSecond, soundOutput.soundBufferSize);
+			Win32FillSoundBuffer(&soundOutput, 0, soundOutput.soundBufferSize);
+			globalSoundBuffer->Play(0, 0, DSBPLAY_LOOPING);
 
 			while(isRunning)
 			{
@@ -334,76 +399,26 @@ WinMain(HINSTANCE instance,
 				// Lock direct sound buffer
 				DWORD playCursor;
 				DWORD writeCursor;
-				bool soundIsPlaying = false;
 				if(SUCCEEDED(globalSoundBuffer->GetCurrentPosition(&playCursor, &writeCursor)))
 				{
-					DWORD byteToLock = (runningSampleIndex * bytesPerSample) % soundBufferSize;
+					DWORD byteToLock = (soundOutput.runningSampleIndex * soundOutput.bytesPerSample) % soundOutput.soundBufferSize;
 					DWORD bytesToWrite;
 					if(byteToLock == playCursor)	// If nothing has been played.
 					{
-						bytesToWrite = soundBufferSize;
+						bytesToWrite = 0;
 					}
 					else if(byteToLock > playCursor)	// write cursor is ahead of the play cursor in the circular buffer.
 														// So we want to write from the write cursor to the end of the buffer, plsu from the start of the buffer to the play cursor.
 					{
-						bytesToWrite = soundBufferSize - byteToLock;
+						bytesToWrite = soundOutput.soundBufferSize - byteToLock;
 						bytesToWrite += playCursor;
 					}
 					else // play cursor is ahead of the write cursor, so we want to write from write cursor to the play cursor
 					{
 						bytesToWrite = playCursor - byteToLock;
 					}
-					VOID *region1;
-					DWORD region1Size;
-					VOID *region2;
-					DWORD region2Size;
 
-					HRESULT gotLock = SUCCEEDED(globalSoundBuffer->Lock(
-						byteToLock,
-						bytesToWrite,
-						&region1, &region1Size,
-						&region2, &region2Size,
-						0
-					));
-					if(gotLock)
-					{
-						// TODO: Assert region1Size is valid
-						DWORD region1SampleCount = region1Size / bytesPerSample;
-						int16_t *sampleOut = (int16_t *)region1;
-						for(DWORD sampleIndex = 0;
-							sampleIndex < region1SampleCount;
-							++sampleIndex)
-						{
-							float t = 2.0f * Pi32 * ((float)runningSampleIndex / (float)wavePeriod); // where we are in the sin period
-							float sineValue = sinf(t);
-							int16_t sampleValue = (int16_t)(sineValue * toneVolume);
-							*sampleOut++ = sampleValue; // writes the sampleValue to the buffer
-							*sampleOut++ = sampleValue;
-							++runningSampleIndex;
-						}
-
-						DWORD region2SampleCount = region2Size / bytesPerSample;
-						sampleOut = (int16_t *)region2;
-						for(DWORD sampleIndex = 0;
-							sampleIndex < region2SampleCount;
-							++sampleIndex)
-						{
-							float t = 2.0f * Pi32 * ((float)runningSampleIndex / (float)wavePeriod); // where we are in the sin period
-							float sineValue = sinf(t);
-							int16_t sampleValue = (int16_t)(sineValue * toneVolume);
-							*sampleOut++ = sampleValue; // writes the sampleValue to the buffer
-							*sampleOut++ = sampleValue;
-							++runningSampleIndex;
-						}
-
-						globalSoundBuffer->Unlock(region1, region1Size, region2, region2Size);
-					}
-				}
-
-				if(!soundIsPlaying)
-				{
-					globalSoundBuffer->Play(0, 0, DSBPLAY_LOOPING);
-					soundIsPlaying = true;
+					Win32FillSoundBuffer(&soundOutput, byteToLock, bytesToWrite);
 				}
 
 				win32_window_dimension windowSize = Win32_GetWindowDimension(window);

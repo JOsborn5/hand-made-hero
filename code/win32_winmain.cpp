@@ -33,9 +33,10 @@ struct win32_window_dimension
 global_variable bool isRunning = false;
 global_variable win32_offscreen_buffer globalBackBuffer;
 global_variable LPDIRECTSOUNDBUFFER globalSoundBuffer;
+global_variable int xOffset = 0;
+global_variable int yOffset = 0;
 
-internal void
-RenderWeirdGradient(win32_offscreen_buffer *buffer, int xOffset, int yOffset)
+internal void RenderWeirdGradient(win32_offscreen_buffer *buffer, int xOffsetVal, int yOffsetVal)
 {
 	uint8_t *row = (uint8_t *) buffer->memory;
 	for(int Y = 0; Y < buffer->height; Y++)
@@ -45,20 +46,20 @@ RenderWeirdGradient(win32_offscreen_buffer *buffer, int xOffset, int yOffset)
 		{
 			/*
 				pixel in memory: BB GG RR xx
-				littel endian architecture
+				little endian architecture
 				0x xxBBGGRR
 			*/
 			
 			//BLUE
-			*pixel = (uint8_t)(X + xOffset); // using * because we're writing to the memory location stored in the pixel variabe
+			*pixel = (uint8_t)(X + xOffsetVal); // using * because we're writing to the memory location stored in the pixel variabe
 			pixel++; // not using * because we're moving the pointer (working out where the memory location is for the next pixel)
 
 			//GREEN
-			*pixel = (uint8_t)(Y - yOffset);
+			*pixel = (uint8_t)(Y - yOffsetVal);
 			pixel++;
 
 			//RED
-			*pixel = (uint8_t)(buffer->width - X + xOffset);
+			*pixel = (uint8_t)(buffer->width - X + xOffsetVal);
 			pixel++;
 
 			// PADDING BYTE
@@ -70,10 +71,8 @@ RenderWeirdGradient(win32_offscreen_buffer *buffer, int xOffset, int yOffset)
 	}
 }
 
-
-internal void
 // Note this changes the buffer so we're passing the buffer as a pointer so this function will update it
-Win32_ResizeDIBSection(win32_offscreen_buffer *buffer, int width, int height)
+internal void Win32_ResizeDIBSection(win32_offscreen_buffer *buffer, int width, int height)
 {
 	if(buffer->memory)
 	{
@@ -95,8 +94,7 @@ Win32_ResizeDIBSection(win32_offscreen_buffer *buffer, int width, int height)
 	buffer->memory = VirtualAlloc(0, bitmapMemorySize, MEM_COMMIT, PAGE_READWRITE);
 }
 
-internal void
-Win32_InitDirectSound(HWND window, int32_t samplesPerSecond, int32_t bufferSize)
+internal void Win32_InitDirectSound(HWND window, int32_t samplesPerSecond, int32_t bufferSize)
 {
 	// Load the library
 	HMODULE DirectSoundLibrary = LoadLibraryA("dsound.dll");
@@ -161,8 +159,7 @@ Win32_InitDirectSound(HWND window, int32_t samplesPerSecond, int32_t bufferSize)
 	}
 }
 
-win32_window_dimension
-Win32_GetWindowDimension(HWND window)
+win32_window_dimension Win32_GetWindowDimension(HWND window)
 {
 	win32_window_dimension windowDim;
 
@@ -175,8 +172,7 @@ Win32_GetWindowDimension(HWND window)
 	return windowDim;
 }
 
-internal void
-Win32_DisplayBufferInWindow(HDC deviceContext, int width, int height, win32_offscreen_buffer *buffer)
+internal void Win32_DisplayBufferInWindow(HDC deviceContext, int width, int height, win32_offscreen_buffer *buffer)
 {
 	StretchDIBits(deviceContext,
 		0, 0, width, height,
@@ -187,11 +183,7 @@ Win32_DisplayBufferInWindow(HDC deviceContext, int width, int height, win32_offs
 		SRCCOPY);
 }
 
-LRESULT CALLBACK
-Win32_MainWindowCallback(HWND window,
-						UINT message,
-						WPARAM wParam,
-						LPARAM lParam)
+LRESULT CALLBACK Win32_MainWindowCallback(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	LRESULT result = -1;
 
@@ -221,23 +213,24 @@ Win32_MainWindowCallback(HWND window,
 			{
 				if(vKCode == VK_UP)
 				{
-
+					yOffset -= 10;
 				}
 				else if (vKCode == VK_DOWN)
 				{
-
+					yOffset += 10;
 				}
 				else if (vKCode == VK_LEFT)
 				{
-
+					xOffset -= 10;
 				}
 				else if (vKCode == VK_RIGHT)
 				{
-
+					xOffset += 10;
 				}
 				else if (vKCode == VK_ESCAPE)
 				{
-
+					xOffset = 0;
+					yOffset = 0;
 				}
 				else if (vKCode == VK_SPACE)
 				{
@@ -330,11 +323,7 @@ void Win32FillSoundBuffer(win32_sound_output *soundOutput, DWORD byteToLock, DWO
 	}
 }
 
-int CALLBACK
-WinMain(HINSTANCE instance,
-		HINSTANCE prevInstance,
-		LPSTR commandLine,
-		int showCode)
+int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLine, int showCode)
 {
 	WNDCLASSA windowClass = {};
 	windowClass.style = CS_OWNDC|CS_HREDRAW|CS_VREDRAW;
@@ -363,8 +352,6 @@ WinMain(HINSTANCE instance,
 		{
 			MSG message;
 			isRunning = true;
-			int xOffset = 0;
-			int yOffset = 0;
 
 			win32_sound_output soundOutput = {};
 		

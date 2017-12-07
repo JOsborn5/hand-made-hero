@@ -30,11 +30,24 @@ struct win32_window_dimension
 	int height;
 };
 
+struct win32_sound_output
+{
+	int samplesPerSecond;
+	int *toneHz;
+	int toneVolume;
+	uint32_t runningSampleIndex; // unsigned because we want this to loop back to zero once it hits its max
+	int wavePeriod;
+	int bytesPerSample;
+	int soundBufferSize;
+	float tSine;
+};
+
 global_variable bool isRunning = false;
 global_variable win32_offscreen_buffer globalBackBuffer;
 global_variable LPDIRECTSOUNDBUFFER globalSoundBuffer;
 global_variable int xOffset = 0;
 global_variable int yOffset = 0;
+global_variable int pitch = 256;
 
 internal void RenderWeirdGradient(win32_offscreen_buffer *buffer, int xOffsetVal, int yOffsetVal)
 {
@@ -214,10 +227,12 @@ LRESULT CALLBACK Win32_MainWindowCallback(HWND window, UINT message, WPARAM wPar
 				if(vKCode == VK_UP)
 				{
 					yOffset -= 10;
+					pitch += 20;
 				}
 				else if (vKCode == VK_DOWN)
 				{
 					yOffset += 10;
+					pitch -= 20;
 				}
 				else if (vKCode == VK_LEFT)
 				{
@@ -231,6 +246,7 @@ LRESULT CALLBACK Win32_MainWindowCallback(HWND window, UINT message, WPARAM wPar
 				{
 					xOffset = 0;
 					yOffset = 0;
+					pitch = 256;
 				}
 				else if (vKCode == VK_SPACE)
 				{
@@ -262,18 +278,6 @@ LRESULT CALLBACK Win32_MainWindowCallback(HWND window, UINT message, WPARAM wPar
 	return result;
 }
 
-struct win32_sound_output
-{
-	int samplesPerSecond;
-	int toneHz;
-	int toneVolume;
-	uint32_t runningSampleIndex; // unsigned because we want this to loop back to zero once it hits its max
-	int wavePeriod;
-	int bytesPerSample;
-	int soundBufferSize;
-	float tSine;
-};
-
 void Win32FillSoundBuffer(win32_sound_output *soundOutput, DWORD byteToLock, DWORD bytesToWrite)
 {
 	VOID *region1;
@@ -301,6 +305,7 @@ void Win32FillSoundBuffer(win32_sound_output *soundOutput, DWORD byteToLock, DWO
 			int16_t sampleValue = (int16_t)(sineValue * soundOutput->toneVolume);
 			*sampleOut++ = sampleValue; // writes the sampleValue to the buffer
 			*sampleOut++ = sampleValue;
+			soundOutput->wavePeriod = soundOutput->samplesPerSecond / *soundOutput->toneHz;
 			soundOutput->tSine += 2.0f * Pi32 * 1.0f/(float)soundOutput->wavePeriod;
 			++soundOutput->runningSampleIndex;
 		}
@@ -315,6 +320,7 @@ void Win32FillSoundBuffer(win32_sound_output *soundOutput, DWORD byteToLock, DWO
 			int16_t sampleValue = (int16_t)(sineValue * soundOutput->toneVolume);
 			*sampleOut++ = sampleValue; // writes the sampleValue to the buffer
 			*sampleOut++ = sampleValue;
+			soundOutput->wavePeriod = soundOutput->samplesPerSecond / *soundOutput->toneHz;
 			soundOutput->tSine += 2.0f * Pi32 * 1.0f/(float)soundOutput->wavePeriod;
 			++soundOutput->runningSampleIndex;
 		}
@@ -356,10 +362,10 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 			win32_sound_output soundOutput = {};
 		
 			soundOutput.samplesPerSecond = 48000;
-			soundOutput.toneHz = 256;
-			soundOutput.toneVolume = 500;
+			soundOutput.toneHz = &pitch;
+			soundOutput.toneVolume = 3000;
 			soundOutput.runningSampleIndex = 0; // unsigned because we want this to loop back to zero once it hits its max
-			soundOutput.wavePeriod = soundOutput.samplesPerSecond / soundOutput.toneHz;
+			soundOutput.wavePeriod = soundOutput.samplesPerSecond / *soundOutput.toneHz;
 			soundOutput.bytesPerSample = sizeof(int16_t) * 2;
 			soundOutput.soundBufferSize = soundOutput.samplesPerSecond * soundOutput.bytesPerSample;
 

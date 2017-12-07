@@ -1,5 +1,6 @@
 #include <windows.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <dsound.h>
 #include <math.h>
 
@@ -331,6 +332,10 @@ void Win32FillSoundBuffer(win32_sound_output *soundOutput, DWORD byteToLock, DWO
 
 int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLine, int showCode)
 {
+	LARGE_INTEGER perfCounterFrequencyResult;
+	QueryPerformanceFrequency(&perfCounterFrequencyResult);
+	int64_t perfCountFrequency = perfCounterFrequencyResult.QuadPart;
+
 	WNDCLASSA windowClass = {};
 	windowClass.style = CS_OWNDC|CS_HREDRAW|CS_VREDRAW;
 	windowClass.lpfnWndProc = Win32_MainWindowCallback;
@@ -356,7 +361,6 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 								0);
 		if(window)
 		{
-			MSG message;
 			isRunning = true;
 
 			win32_sound_output soundOutput = {};
@@ -373,8 +377,14 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 			Win32FillSoundBuffer(&soundOutput, 0, soundOutput.soundBufferSize);
 			globalSoundBuffer->Play(0, 0, DSBPLAY_LOOPING);
 
+			LARGE_INTEGER lastCounter;
+			QueryPerformanceCounter(&lastCounter);
+
+			int64_t lastCycleCount = __rdtsc();
+
 			while(isRunning)
 			{
+				MSG message;
 				// flush the queue of messages from windows in this loop
 				while(PeekMessage(&message, 0, 0, 0, PM_REMOVE))
 				{
@@ -421,6 +431,22 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 
 				xOffset += 1;
 				yOffset += 1;
+
+				int64_t endCycleCount = __rdtsc();
+				int64_t cyclesElapsed = endCycleCount - lastCycleCount;
+				int32_t megaCyclesPerFrame = cyclesElapsed / (1000 * 1000);
+
+				LARGE_INTEGER endCounter;
+				QueryPerformanceCounter(&endCounter);
+				int64_t counterElapsed = endCounter.QuadPart - lastCounter.QuadPart;
+				int32_t msPerFrame = (1000 * counterElapsed) / perfCountFrequency;
+
+				char buffer[256];
+				wsprintf(buffer, "ms/frame: %d, mega cycles/frame: %d\n", msPerFrame, megaCyclesPerFrame);
+				OutputDebugStringA(buffer);
+
+				lastCounter = endCounter;
+				lastCycleCount = endCycleCount;
 			}
 		}
 		else

@@ -14,16 +14,7 @@
 // Pointer to our macro:
 typedef DIRECT_SOUND_CREATE(direct_sound_create);
 
-// Stuff for our RGB display buffer
-struct win32_offscreen_buffer
-{
-	BITMAPINFO info;
-	void *memory;
-	int width;
-	int height;
-	int pitch;
-	int bytesPerPixel = 4;
-};
+#include "handmade.cpp"
 
 struct win32_window_dimension
 {
@@ -44,49 +35,15 @@ struct win32_sound_output
 };
 
 global_variable bool isRunning = false;
-global_variable win32_offscreen_buffer globalBackBuffer;
+global_variable game_offscreen_buffer globalBackBuffer;
 global_variable LPDIRECTSOUNDBUFFER globalSoundBuffer;
 global_variable int xOffset = 0;
 global_variable int yOffset = 0;
 global_variable int pitch = 256;
 
-internal void RenderWeirdGradient(win32_offscreen_buffer *buffer, int xOffsetVal, int yOffsetVal)
-{
-	uint8_t *row = (uint8_t *) buffer->memory;
-	for(int Y = 0; Y < buffer->height; Y++)
-	{
-		uint8_t *pixel = (uint8_t *)row;
-		for(int X = 0; X < buffer->width; X++)
-		{
-			/*
-				pixel in memory: BB GG RR xx
-				little endian architecture
-				0x xxBBGGRR
-			*/
-			
-			//BLUE
-			*pixel = (uint8_t)(X + xOffsetVal); // using * because we're writing to the memory location stored in the pixel variabe
-			pixel++; // not using * because we're moving the pointer (working out where the memory location is for the next pixel)
-
-			//GREEN
-			*pixel = (uint8_t)(Y - yOffsetVal);
-			pixel++;
-
-			//RED
-			*pixel = (uint8_t)(buffer->width - X + xOffsetVal);
-			pixel++;
-
-			// PADDING BYTE
-			*pixel = 0;
-			pixel++;
-			
-		}
-		row += buffer->pitch;
-	}
-}
 
 // Note this changes the buffer so we're passing the buffer as a pointer so this function will update it
-internal void Win32_ResizeDIBSection(win32_offscreen_buffer *buffer, int width, int height)
+internal void Win32_ResizeDIBSection(game_offscreen_buffer* buffer, int width, int height)
 {
 	if(buffer->memory)
 	{
@@ -186,7 +143,7 @@ win32_window_dimension Win32_GetWindowDimension(HWND window)
 	return windowDim;
 }
 
-internal void Win32_DisplayBufferInWindow(HDC deviceContext, int width, int height, win32_offscreen_buffer *buffer)
+internal void Win32_DisplayBufferInWindow(HDC deviceContext, int width, int height, game_offscreen_buffer* buffer)
 {
 	StretchDIBits(deviceContext,
 		0, 0, width, height,
@@ -396,7 +353,8 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 					DispatchMessage(&message);
 				}
 
-				RenderWeirdGradient(&globalBackBuffer, xOffset, yOffset);
+				GameUpdateAndRender(&globalBackBuffer, xOffset, yOffset);
+				//RenderWeirdGradient(&globalBackBuffer, xOffset, yOffset);
 
 				// Direct sound output test
 				// Lock direct sound buffer

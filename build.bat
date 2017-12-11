@@ -1,4 +1,4 @@
-REM https://hero.handmade.network/episode/code/day012
+REM https://hero.handmade.network/episode/code/day012 32:00
 
 @echo off
 call "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat" x64

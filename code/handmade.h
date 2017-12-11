@@ -3,7 +3,6 @@
 /*
 	Services the game provides to the platform layer
 */
-void GameUpdateAndRender();
 
 // Stuff for our RGB display buffer
 struct game_offscreen_buffer
@@ -15,6 +14,15 @@ struct game_offscreen_buffer
 	int pitch;
 	int bytesPerPixel = 4;
 };
+
+struct game_sound_output_buffer
+{
+	int samplesPerSecond;
+	int sampleCount;
+	int16_t* samples;
+};
+
+void GameUpdateAndRender(game_offscreen_buffer* videoBuffer, game_sound_output_buffer* soundBuffer);
 
 /*
 	Services the platform layer provides to the game

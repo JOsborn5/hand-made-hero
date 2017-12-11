@@ -353,8 +353,13 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 					DispatchMessage(&message);
 				}
 
-				GameUpdateAndRender(&globalBackBuffer, xOffset, yOffset);
-				//RenderWeirdGradient(&globalBackBuffer, xOffset, yOffset);
+				int16_t samples[(48000/30) * 2];
+				game_sound_output_buffer soundBuffer = {};
+				soundBuffer.samplesPerSecond = soundOutput.samplesPerSecond;
+				soundBuffer.sampleCount = soundBuffer.samplesPerSecond / 30; // Aiming for 30 FPS, so for each frame fill 1/30th a second of sound
+				soundBuffer.samples = samples;
+
+				GameUpdateAndRender(&globalBackBuffer, &soundBuffer, xOffset, yOffset);
 
 				// Direct sound output test
 				// Lock direct sound buffer

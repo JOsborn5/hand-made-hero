@@ -15,31 +15,11 @@
 typedef DIRECT_SOUND_CREATE(direct_sound_create);
 
 #include "handmade.cpp"
-
-struct win32_window_dimension
-{
-	int width;
-	int height;
-};
-
-struct win32_sound_output
-{
-	int samplesPerSecond;
-	int *toneHz;
-	int toneVolume;
-	uint32_t runningSampleIndex; // unsigned because we want this to loop back to zero once it hits its max
-	int bytesPerSample;
-	int soundBufferSize;
-	int latencySampleCount;
-};
+#include "win32_handmade.h"
 
 global_variable bool isRunning = false;
 global_variable game_offscreen_buffer globalBackBuffer;
 global_variable LPDIRECTSOUNDBUFFER globalSoundBuffer;
-global_variable int xOffset = 0;
-global_variable int yOffset = 0;
-global_variable int pitch = 256;
-
 
 // Note this changes the buffer so we're passing the buffer as a pointer so this function will update it
 internal void Win32_ResizeDIBSection(game_offscreen_buffer* buffer, int width, int height)
@@ -183,27 +163,18 @@ LRESULT CALLBACK Win32_MainWindowCallback(HWND window, UINT message, WPARAM wPar
 			{
 				if(vKCode == VK_UP)
 				{
-					yOffset -= 10;
-					pitch += 20;
 				}
 				else if (vKCode == VK_DOWN)
 				{
-					yOffset += 10;
-					pitch -= 20;
 				}
 				else if (vKCode == VK_LEFT)
 				{
-					xOffset -= 10;
 				}
 				else if (vKCode == VK_RIGHT)
 				{
-					xOffset += 10;
 				}
 				else if (vKCode == VK_ESCAPE)
 				{
-					xOffset = 0;
-					yOffset = 0;
-					pitch = 256;
 				}
 				else if (vKCode == VK_SPACE)
 				{
@@ -351,8 +322,6 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 			win32_sound_output soundOutput = {};
 		
 			soundOutput.samplesPerSecond = 48000;
-			soundOutput.toneHz = &pitch;
-			soundOutput.toneVolume = 3000;
 			soundOutput.runningSampleIndex = 0; // unsigned because we want this to loop back to zero once it hits its max
 			soundOutput.bytesPerSample = sizeof(int16_t) * 2;
 			soundOutput.soundBufferSize = soundOutput.samplesPerSecond * soundOutput.bytesPerSample;
@@ -370,6 +339,9 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 			while(isRunning)
 			{
 				MSG message;
+
+				game_input gameInput = {};
+
 				// flush the queue of messages from windows in this loop
 				while(PeekMessage(&message, 0, 0, 0, PM_REMOVE))
 				{
@@ -410,13 +382,16 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 
 				int16_t *samples = (int16_t *)VirtualAlloc(0, soundOutput.soundBufferSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 
+				game_memory gameMemory = {};
+				gameMemory.permanentStorageSpace = Megabytes(64);
+				gameMemory.permanentStorage = VirtualAlloc(0, gameMemory.permanentStorageSpace, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 
 				game_sound_output_buffer soundBuffer = {};
 				soundBuffer.samplesPerSecond = soundOutput.samplesPerSecond;
 				soundBuffer.sampleCount = bytesToWrite / soundOutput.bytesPerSample;
 				soundBuffer.samples = samples;
 
-				GameUpdateAndRender(&globalBackBuffer, &soundBuffer, xOffset, yOffset);
+				GameUpdateAndRender(&gameMemory, &gameInput, &globalBackBuffer, &soundBuffer);
 
 				if(soundIsValid)
 				{
@@ -427,9 +402,6 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 				HDC deviceContext = GetDC(window);
 				Win32_DisplayBufferInWindow(deviceContext, windowSize.width, windowSize.height, &globalBackBuffer);
 				ReleaseDC(window, deviceContext);
-
-				xOffset += 1;
-				yOffset += 1;
 
 				int64_t endCycleCount = __rdtsc();
 				int64_t cyclesElapsed = endCycleCount - lastCycleCount;

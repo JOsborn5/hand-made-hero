@@ -57,8 +57,30 @@ static void GameOutputSound(game_sound_output_buffer* soundOutput)
 	}
 }
 
-void GameUpdateAndRender(game_offscreen_buffer* videoBuffer, game_sound_output_buffer* soundBuffer, int xOffsetVal, int yOffsetVal)
+void GameUpdateAndRender(game_memory *memory, game_input* gameInput, game_offscreen_buffer* videoBuffer, game_sound_output_buffer* soundBuffer)
 {
+	game_state *gameState = (game_state *)memory->permanentStorage;
+
+	if(!memory->isInitialized)
+	{
+		gameState->toneHz = 256;
+		gameState->xOffset = 0;
+		gameState->yOffset = 0;
+		memory->isInitialized = true;
+	}
+
+	game_controller_input *input0 = &gameInput->controllers[0];
+
+	if(input0->isAnalogue)
+	{
+
+	}
+	else
+	{
+		gameState->toneHz = 256 + (int)(128.0f * input0->endX);
+		gameState->yOffset = (int)(4.0f * input0->endY);
+	}
+
 	GameOutputSound(soundBuffer);
-	RenderWeirdGradient(videoBuffer, xOffsetVal, yOffsetVal);
+	RenderWeirdGradient(videoBuffer, gameState->xOffset, gameState->yOffset);
 }

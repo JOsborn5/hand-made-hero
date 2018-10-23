@@ -348,6 +348,10 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 				wsprintf(errorCodeBuffer, "VirtualAlloc error code: %d\n", errorCode);
 			}
 
+			game_sound_output_buffer soundBuffer = {};
+			soundBuffer.samplesPerSecond = soundOutput.samplesPerSecond;
+			soundBuffer.samples = samples;
+
 			while(isRunning)
 			{
 				MSG message;
@@ -392,11 +396,7 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 					soundIsValid = true;
 				}
 
-				game_sound_output_buffer soundBuffer = {};
-				soundBuffer.samplesPerSecond = soundOutput.samplesPerSecond;
 				soundBuffer.sampleCount = bytesToWrite / soundOutput.bytesPerSample;
-				soundBuffer.samples = samples;
-
 				GameUpdateAndRender(&gameMemory, &gameInput, &globalBackBuffer, &soundBuffer);
 
 				if(soundIsValid)

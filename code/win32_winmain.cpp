@@ -268,7 +268,7 @@ void Win32FillSoundBuffer(win32_sound_output *soundOutput, DWORD byteToLock, DWO
 		{
 			*destSample++ = *sourceSample++; // writes the samples from sourceSample to destSample
 			*destSample++ = *sourceSample++;
-			++soundOutput->runningSampleIndex;
+			++(soundOutput->runningSampleIndex);
 		}
 
 		DWORD region2SampleCount = region2Size / soundOutput->bytesPerSample;
@@ -279,7 +279,7 @@ void Win32FillSoundBuffer(win32_sound_output *soundOutput, DWORD byteToLock, DWO
 		{
 			*destSample++ = *sourceSample++; // writes the samples from sourceSample to destSample
 			*destSample++ = *sourceSample++;
-			++soundOutput->runningSampleIndex;
+			++(soundOutput->runningSampleIndex);
 		}
 
 		globalSoundBuffer->Unlock(region1, region1Size, region2, region2Size);
@@ -336,6 +336,18 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 
 			int64_t lastCycleCount = __rdtsc();
 
+			int16_t *samples = (int16_t *)VirtualAlloc(0, soundOutput.soundBufferSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+
+			game_memory gameMemory = {};
+			gameMemory.permanentStorageSpace = Megabytes(64);
+			gameMemory.permanentStorage = VirtualAlloc(0, gameMemory.permanentStorageSpace, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+			if(gameMemory.permanentStorage == NULL)
+			{
+				DWORD errorCode = GetLastError();
+				char errorCodeBuffer[256];
+				wsprintf(errorCodeBuffer, "VirtualAlloc error code: %d\n", errorCode);
+			}
+
 			while(isRunning)
 			{
 				MSG message;
@@ -368,7 +380,7 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 						(soundOutput.latencySampleCount * soundOutput.bytesPerSample)) %
 						soundOutput.soundBufferSize);
 					if(byteToLock > targetCursor)	// write cursor is ahead of the play cursor in the circular buffer.
-													// So we want to write from the write cursor to the end of the buffer, plsu from the start of the buffer to the play cursor.
+													// So we want to write from the write cursor to the end of the buffer, plus from the start of the buffer to the play cursor.
 					{
 						bytesToWrite = soundOutput.soundBufferSize - byteToLock;
 						bytesToWrite += targetCursor;
@@ -379,12 +391,6 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 					}
 					soundIsValid = true;
 				}
-
-				int16_t *samples = (int16_t *)VirtualAlloc(0, soundOutput.soundBufferSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-
-				game_memory gameMemory = {};
-				gameMemory.permanentStorageSpace = Megabytes(64);
-				gameMemory.permanentStorage = VirtualAlloc(0, gameMemory.permanentStorageSpace, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 
 				game_sound_output_buffer soundBuffer = {};
 				soundBuffer.samplesPerSecond = soundOutput.samplesPerSecond;

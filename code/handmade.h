@@ -2,6 +2,7 @@
 
 #define Kilobytes(value) ((value) * 1024)
 #define Megabytes(value) (Kilobytes(value) * 1024)
+#define Gigabytes(value) (Megabytes(value) * 1024)
 #define ArrayCount(array) (sizeof(array) / (sizeof((array)[0])))
 
 /*
@@ -70,7 +71,9 @@ struct game_memory
 {
 	bool isInitialized;
 	uint64_t permanentStorageSpace;
+	uint64_t transientStorageSpace;
 	void *permanentStorage;
+	void *transientStorage;
 };
 
 void GameUpdateAndRender(game_memory *memory, game_input* gameInput, game_offscreen_buffer* videoBuffer, game_sound_output_buffer* soundBuffer);

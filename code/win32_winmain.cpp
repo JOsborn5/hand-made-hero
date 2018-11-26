@@ -286,6 +286,13 @@ void Win32FillSoundBuffer(win32_sound_output *soundOutput, DWORD byteToLock, DWO
 	}
 }
 
+void DisplayLastWin32Error()
+{
+	DWORD errorCode = GetLastError();
+	char errorCodeBuffer[256];
+	wsprintf(errorCodeBuffer, "VirtualAlloc error code: %d\n", errorCode);
+}
+
 int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLine, int showCode)
 {
 	LARGE_INTEGER perfCounterFrequencyResult;
@@ -336,23 +343,36 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 
 			int64_t lastCycleCount = __rdtsc();
 
+			bool successfulMemoryAllocation = true;
 			int16_t *samples = (int16_t *)VirtualAlloc(0, soundOutput.soundBufferSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+			if(samples == NULL)
+			{
+				successfulMemoryAllocation = false;
+				DisplayLastWin32Error();
+			}
 
 			game_memory gameMemory = {};
 			gameMemory.permanentStorageSpace = Megabytes(64);
 			gameMemory.permanentStorage = VirtualAlloc(0, gameMemory.permanentStorageSpace, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 			if(gameMemory.permanentStorage == NULL)
 			{
-				DWORD errorCode = GetLastError();
-				char errorCodeBuffer[256];
-				wsprintf(errorCodeBuffer, "VirtualAlloc error code: %d\n", errorCode);
+				successfulMemoryAllocation = false;
+				DisplayLastWin32Error();
+			}
+
+			gameMemory.transientStorageSpace = Gigabytes((uint64_t)4);
+			gameMemory.transientStorage = VirtualAlloc(0, gameMemory.transientStorageSpace, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+			if(gameMemory.transientStorage == NULL)
+			{
+				successfulMemoryAllocation = false;
+				DisplayLastWin32Error();
 			}
 
 			game_sound_output_buffer soundBuffer = {};
 			soundBuffer.samplesPerSecond = soundOutput.samplesPerSecond;
 			soundBuffer.samples = samples;
 
-			while(isRunning)
+			while(successfulMemoryAllocation && isRunning)
 			{
 				MSG message;
 

@@ -1,4 +1,4 @@
-REM https://hero.handmade.network/episode/code/day014 26:33
+REM https://hero.handmade.network/episode/code/day014 38:15
 
 SET OUTPUT_DIR=bin
 

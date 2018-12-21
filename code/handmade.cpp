@@ -59,6 +59,8 @@ static void GameOutputSound(game_sound_output_buffer* soundOutput)
 
 void GameUpdateAndRender(game_memory *memory, game_input* gameInput, game_offscreen_buffer* videoBuffer, game_sound_output_buffer* soundBuffer)
 {
+	Assert(sizeof(game_state) <= (memory->permanentStorageSpace));
+
 	game_state *gameState = (game_state *)memory->permanentStorage;
 
 	if(!memory->isInitialized)

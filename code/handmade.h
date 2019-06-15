@@ -1,6 +1,16 @@
 #if !defined(HANDMADE_H)
 
-#if DEBUG
+/**
+ * HANDMADE_INTERNAL:
+ * 0 - Build for public release
+ * 1 - Build for develop only
+ *
+ * HANDMADE_SLOW
+ * 0 - No slow code allowed
+ * 1 - Slow code welcome
+ */
+
+#if HANDMADE_SLOW
 	#define Assert(expression) if (!(expression)) { *(int *)0 = 0; }
 #else
 	#define Assert(expression)
@@ -8,6 +18,7 @@
 #define Kilobytes(value) ((value) * 1024)
 #define Megabytes(value) (Kilobytes(value) * 1024)
 #define Gigabytes(value) (Megabytes(value) * 1024)
+#define Terabytes(value) (Gigabytes(value) * 1024)
 #define ArrayCount(array) (sizeof(array) / (sizeof((array)[0])))
 
 /*

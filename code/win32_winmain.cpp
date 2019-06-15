@@ -17,9 +17,9 @@ typedef DIRECT_SOUND_CREATE(direct_sound_create);
 #include "handmade.cpp"
 #include "win32_handmade.h"
 
-global_variable bool isRunning = false;
-global_variable game_offscreen_buffer globalBackBuffer;
-global_variable LPDIRECTSOUNDBUFFER globalSoundBuffer;
+global_variable bool IsRunning = false;
+global_variable game_offscreen_buffer GlobalBackBuffer;
+global_variable LPDIRECTSOUNDBUFFER GlobalSoundBuffer;
 
 // Note this changes the buffer so we're passing the buffer as a pointer so this function will update it
 internal void Win32_ResizeDIBSection(game_offscreen_buffer* buffer, int width, int height)
@@ -91,7 +91,7 @@ internal void Win32_InitDirectSound(HWND window, int32_t samplesPerSecond, int32
 			bufferDescription.dwBufferBytes = bufferSize;
 			bufferDescription.lpwfxFormat = &waveFormat;
 			
-			HRESULT error = directSound->CreateSoundBuffer(&bufferDescription, &globalSoundBuffer, 0);
+			HRESULT error = directSound->CreateSoundBuffer(&bufferDescription, &GlobalSoundBuffer, 0);
 			if(SUCCEEDED(error))
 			{
 				OutputDebugStringA("Secondary sound buffer created successfully.\n");
@@ -145,11 +145,11 @@ LRESULT CALLBACK Win32_MainWindowCallback(HWND window, UINT message, WPARAM wPar
 		} break;
 		case WM_DESTROY:
 		{
-			isRunning = false;
+			IsRunning = false;
 		} break;
 		case WM_CLOSE:
 		{
-			isRunning = false;
+			IsRunning = false;
 		} break;
 		case WM_SYSKEYDOWN:
 		case WM_SYSKEYUP:
@@ -185,7 +185,7 @@ LRESULT CALLBACK Win32_MainWindowCallback(HWND window, UINT message, WPARAM wPar
 			bool altKeyDown = ((lParam & (1 << 29)) != 0);
 			if((vKCode == VK_F4) && altKeyDown)
 			{
-				isRunning = false;
+				IsRunning = false;
 			}
 		} break;
 		case WM_PAINT:
@@ -193,7 +193,7 @@ LRESULT CALLBACK Win32_MainWindowCallback(HWND window, UINT message, WPARAM wPar
 			PAINTSTRUCT paint;
 			HDC deviceContext = BeginPaint(window, &paint);
 			win32_window_dimension windowSize = Win32_GetWindowDimension(window);
-			Win32_DisplayBufferInWindow(deviceContext, windowSize.width, windowSize.height, &globalBackBuffer);
+			Win32_DisplayBufferInWindow(deviceContext, windowSize.width, windowSize.height, &GlobalBackBuffer);
 			EndPaint(window, &paint);
 		} break;
 		default:
@@ -213,7 +213,7 @@ void Win32ClearBuffer(win32_sound_output *soundOutput)
 	VOID *region2;
 	DWORD region2Size;
 
-	HRESULT gotLock = SUCCEEDED(globalSoundBuffer->Lock(
+	HRESULT gotLock = SUCCEEDED(GlobalSoundBuffer->Lock(
 		0,
 		soundOutput->soundBufferSize,
 		&region1, &region1Size,
@@ -238,7 +238,7 @@ void Win32ClearBuffer(win32_sound_output *soundOutput)
 			*destSample++ = 0;
 		}
 
-		globalSoundBuffer->Unlock(region1, region1Size, region2, region2Size);
+		GlobalSoundBuffer->Unlock(region1, region1Size, region2, region2Size);
 	}
 }
 
@@ -249,7 +249,7 @@ void Win32FillSoundBuffer(win32_sound_output *soundOutput, DWORD byteToLock, DWO
 	VOID *region2;
 	DWORD region2Size;
 
-	HRESULT gotLock = SUCCEEDED(globalSoundBuffer->Lock(
+	HRESULT gotLock = SUCCEEDED(GlobalSoundBuffer->Lock(
 		byteToLock,
 		bytesToWrite,
 		&region1, &region1Size,
@@ -282,7 +282,7 @@ void Win32FillSoundBuffer(win32_sound_output *soundOutput, DWORD byteToLock, DWO
 			++(soundOutput->runningSampleIndex);
 		}
 
-		globalSoundBuffer->Unlock(region1, region1Size, region2, region2Size);
+		GlobalSoundBuffer->Unlock(region1, region1Size, region2, region2Size);
 	}
 }
 
@@ -305,7 +305,7 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 	windowClass.hInstance = instance;
 	windowClass.lpszClassName = "Fucking A!";
 
-	Win32_ResizeDIBSection(&globalBackBuffer, 1200, 700);
+	Win32_ResizeDIBSection(&GlobalBackBuffer, 1200, 700);
 
 	if(RegisterClass(&windowClass))
 	{
@@ -324,7 +324,7 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 								0);
 		if(window)
 		{
-			isRunning = true;
+			IsRunning = true;
 
 			win32_sound_output soundOutput = {};
 		
@@ -336,7 +336,7 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 
 			Win32_InitDirectSound(window, soundOutput.samplesPerSecond, soundOutput.soundBufferSize);
 			Win32ClearBuffer(&soundOutput);
-			globalSoundBuffer->Play(0, 0, DSBPLAY_LOOPING);
+			GlobalSoundBuffer->Play(0, 0, DSBPLAY_LOOPING);
 
 			LARGE_INTEGER lastCounter;
 			QueryPerformanceCounter(&lastCounter);
@@ -351,28 +351,30 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 				DisplayLastWin32Error();
 			}
 
+#if HANDMADE_INTERNAL
+			LPVOID BaseAddress = (LPVOID)Terabytes((uint64_t)2);
+#else
+			LPVOID BaseAddress = 0;
+#endif
 			game_memory gameMemory = {};
 			gameMemory.permanentStorageSpace = Megabytes(64);
-			gameMemory.permanentStorage = VirtualAlloc(0, gameMemory.permanentStorageSpace, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+			gameMemory.transientStorageSpace = Gigabytes((uint64_t)4);
+
+			uint64_t TotalStorageSpace = gameMemory.permanentStorageSpace + gameMemory.transientStorageSpace;
+			gameMemory.permanentStorage = VirtualAlloc(BaseAddress, TotalStorageSpace, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 			if(gameMemory.permanentStorage == NULL)
 			{
 				successfulMemoryAllocation = false;
 				DisplayLastWin32Error();
 			}
 
-			gameMemory.transientStorageSpace = Gigabytes((uint64_t)4);
-			gameMemory.transientStorage = VirtualAlloc(0, gameMemory.transientStorageSpace, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-			if(gameMemory.transientStorage == NULL)
-			{
-				successfulMemoryAllocation = false;
-				DisplayLastWin32Error();
-			}
+			gameMemory.transientStorage = ((uint8_t *)gameMemory.permanentStorage + gameMemory.permanentStorageSpace);
 
 			game_sound_output_buffer soundBuffer = {};
 			soundBuffer.samplesPerSecond = soundOutput.samplesPerSecond;
 			soundBuffer.samples = samples;
 
-			while(successfulMemoryAllocation && isRunning)
+			while(successfulMemoryAllocation && IsRunning)
 			{
 				MSG message;
 
@@ -383,7 +385,7 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 				{
 					if(message.message == WM_QUIT)
 					{
-						isRunning = false;
+						IsRunning = false;
 					}
 					TranslateMessage(&message);
 					DispatchMessage(&message);
@@ -397,7 +399,7 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 				DWORD playCursor;
 				DWORD writeCursor;
 				bool soundIsValid = false;
-				if(SUCCEEDED(globalSoundBuffer->GetCurrentPosition(&playCursor, &writeCursor)))
+				if(SUCCEEDED(GlobalSoundBuffer->GetCurrentPosition(&playCursor, &writeCursor)))
 				{
 					byteToLock = (soundOutput.runningSampleIndex * soundOutput.bytesPerSample) % soundOutput.soundBufferSize;
 					targetCursor = ((playCursor +
@@ -417,7 +419,7 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 				}
 
 				soundBuffer.sampleCount = bytesToWrite / soundOutput.bytesPerSample;
-				GameUpdateAndRender(&gameMemory, &gameInput, &globalBackBuffer, &soundBuffer);
+				GameUpdateAndRender(&gameMemory, &gameInput, &GlobalBackBuffer, &soundBuffer);
 
 				if(soundIsValid)
 				{
@@ -426,7 +428,7 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 
 				win32_window_dimension windowSize = Win32_GetWindowDimension(window);
 				HDC deviceContext = GetDC(window);
-				Win32_DisplayBufferInWindow(deviceContext, windowSize.width, windowSize.height, &globalBackBuffer);
+				Win32_DisplayBufferInWindow(deviceContext, windowSize.width, windowSize.height, &GlobalBackBuffer);
 				ReleaseDC(window, deviceContext);
 
 				int64_t endCycleCount = __rdtsc();

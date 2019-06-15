@@ -15,7 +15,7 @@ static void RenderWeirdGradient(game_offscreen_buffer* buffer, int xOffsetVal, i
 			*/
 			
 			//BLUE
-			*pixel = (uint8_t)(X + xOffsetVal); // using * because we're writing to the memory location stored in the pixel variabe
+			*pixel = (uint8_t)(X + xOffsetVal); // using * because we're writing to the memory location stored in the pixel variable
 			pixel++; // not using * because we're moving the pointer (working out where the memory location is for the next pixel)
 
 			//GREEN

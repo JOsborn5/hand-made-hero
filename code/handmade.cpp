@@ -1,11 +1,11 @@
 #include "handmade.h"
 
-static void RenderWeirdGradient(game_offscreen_buffer* buffer, int xOffsetVal, int yOffsetVal)
+static void RenderWeirdGradient(game_offscreen_buffer *buffer, int xOffsetVal, int yOffsetVal)
 {
-	uint8_t* row = (uint8_t*)buffer->memory;
+	uint8_t *row = (uint8_t *)buffer->memory;
 	for(int Y = 0; Y < buffer->height; Y++)
 	{
-		uint8_t* pixel = (uint8_t*)row;
+		uint8_t *pixel = (uint8_t *)row;
 		for(int X = 0; X < buffer->width; X++)
 		{
 			/*
@@ -36,16 +36,16 @@ static void RenderWeirdGradient(game_offscreen_buffer* buffer, int xOffsetVal, i
 }
 
 
-static void GameOutputSound(game_sound_output_buffer* soundOutput)
+static void GameOutputSound(game_sound_output_buffer *SoundOutput)
 {
 	static float tSine;
 	int16_t toneVolume = 3000;
-	int toneHz = 256;
-	int wavePeriod = soundOutput->samplesPerSecond / toneHz;
+	int ToneHz = 256;
+	int WavePeriod = SoundOutput->samplesPerSecond / ToneHz;
 
-	int16_t *sampleOut = soundOutput->samples;
+	int16_t *sampleOut = SoundOutput->samples;
 	for(int sampleIndex = 0;
-		sampleIndex < soundOutput->sampleCount;
+		sampleIndex < SoundOutput->sampleCount;
 		++sampleIndex)
 	{
 		float sineValue = sinf(tSine);
@@ -53,25 +53,25 @@ static void GameOutputSound(game_sound_output_buffer* soundOutput)
 		*sampleOut++ = sampleValue; // writes the sampleValue to the buffer
 		*sampleOut++ = sampleValue;
 
-		tSine += 2.0f * Pi32 * 1.0f/(float)wavePeriod;
+		tSine += 2.0f * Pi32 * 1.0f/(float)WavePeriod;
 	}
 }
 
-void GameUpdateAndRender(game_memory *memory, game_input* gameInput, game_offscreen_buffer* videoBuffer, game_sound_output_buffer* soundBuffer)
+void GameUpdateAndRender(game_memory *memory, game_input *GameInput, game_offscreen_buffer *VideoBuffer, game_sound_output_buffer *SoundBuffer)
 {
 	Assert(sizeof(game_state) <= (memory->permanentStorageSpace));
 
-	game_state *gameState = (game_state *)memory->permanentStorage;
+	game_state *GameState = (game_state *)memory->permanentStorage;
 
 	if(!memory->isInitialized)
 	{
-		gameState->toneHz = 256;
-		gameState->xOffset = 0;
-		gameState->yOffset = 0;
+		GameState->toneHz = 256;
+		GameState->xOffset = 0;
+		GameState->yOffset = 0;
 		memory->isInitialized = true;
 	}
 
-	game_controller_input *input0 = &gameInput->controllers[0];
+	game_controller_input *input0 = &GameInput->controllers[0];
 
 	if(input0->isAnalogue)
 	{
@@ -79,10 +79,10 @@ void GameUpdateAndRender(game_memory *memory, game_input* gameInput, game_offscr
 	}
 	else
 	{
-		gameState->toneHz = 256 + (int)(128.0f * input0->endX);
-		gameState->yOffset = (int)(4.0f * input0->endY);
+		GameState->toneHz = 256 + (int)(128.0f * input0->endX);
+		GameState->yOffset = (int)(4.0f * input0->endY);
 	}
 
-	GameOutputSound(soundBuffer);
-	RenderWeirdGradient(videoBuffer, gameState->xOffset, gameState->yOffset);
+	GameOutputSound(SoundBuffer);
+	RenderWeirdGradient(VideoBuffer, GameState->xOffset, GameState->yOffset);
 }

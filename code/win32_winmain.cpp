@@ -19,9 +19,7 @@ typedef DIRECT_SOUND_CREATE(direct_sound_create);
 
 internal debug_read_file_result DEBUGPlatformReadEntireFile(char *FileName)
 {
-	debug_read_file_result ReadFileResult;
-	ReadFileResult.ContentsSize = 0;
-	ReadFileResult.Contents = 0;
+	debug_read_file_result ReadFileResult = {};
 	HANDLE FileHandle = CreateFileA(FileName, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
 	if(FileHandle != INVALID_HANDLE_VALUE)
 	{
@@ -35,7 +33,7 @@ internal debug_read_file_result DEBUGPlatformReadEntireFile(char *FileName)
 				DWORD BytesToRead;
 				if(ReadFile(FileHandle, ReadFileResult.Contents, FileSize32, &BytesToRead, 0) && FileSize32 == BytesToRead)
 				{
-
+					ReadFileResult.ContentsSize = BytesToRead;
 				}
 				else
 				{

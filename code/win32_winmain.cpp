@@ -9,13 +9,73 @@
 
 #define Pi32 3.14159265359f
 
+#include "handmade.cpp"
+#include "win32_handmade.h"
+
 // Macro:
 #define DIRECT_SOUND_CREATE(name) HRESULT WINAPI name(LPCGUID pcGuidDevice, LPDIRECTSOUND *ppDS, LPUNKNOWN pUnkOuter)
 // Pointer to our macro:
 typedef DIRECT_SOUND_CREATE(direct_sound_create);
 
-#include "handmade.cpp"
-#include "win32_handmade.h"
+internal debug_read_file_result DEBUGPlatformReadEntireFile(char *FileName)
+{
+	debug_read_file_result ReadFileResult;
+	ReadFileResult.ContentsSize = 0;
+	ReadFileResult.Contents = 0;
+	HANDLE FileHandle = CreateFileA(FileName, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
+	if(FileHandle != INVALID_HANDLE_VALUE)
+	{
+		LARGE_INTEGER FileSize;
+		if(GetFileSizeEx(FileHandle, &FileSize))
+		{
+			uint32_t FileSize32 = SafeTruncateUInt64(FileSize.QuadPart); // assert we're not trying to open a file larger than 4GB, since ReadFile will break for 4GB+ file
+			ReadFileResult.Contents = VirtualAlloc(0, FileSize32, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+			if(ReadFileResult.Contents)
+			{
+				DWORD BytesToRead;
+				if(ReadFile(FileHandle, ReadFileResult.Contents, FileSize32, &BytesToRead, 0) && FileSize32 == BytesToRead)
+				{
+
+				}
+				else
+				{
+					DEBUGPlatformFreeFileMemory(ReadFileResult.Contents);
+					ReadFileResult.Contents = 0;
+				}
+			}
+		}
+
+		CloseHandle(FileHandle);
+	}
+
+	return ReadFileResult;
+}
+
+internal void DEBUGPlatformFreeFileMemory(void *Memory)
+{
+	if(Memory)
+	{
+		VirtualFree(Memory, 0, MEM_RELEASE);
+	}
+}
+
+internal bool DEBUGPlatformWriteEntireFile(char *FileName, uint32_t MemorySize, void *Memory)
+{
+	bool Result = false;
+	HANDLE FileHandle = CreateFileA(FileName, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
+	if(FileHandle != INVALID_HANDLE_VALUE)
+	{
+		DWORD BytesWritten;
+		if(WriteFile(FileHandle, Memory, MemorySize, &BytesWritten, 0))
+		{
+			Result = (MemorySize == BytesWritten);
+		}
+
+		CloseHandle(FileHandle);
+	}
+
+	return (Result);
+}
 
 global_variable bool IsRunning = false;
 global_variable game_offscreen_buffer GlobalBackBuffer;

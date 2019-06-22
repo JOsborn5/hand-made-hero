@@ -65,6 +65,13 @@ void GameUpdateAndRender(game_memory *memory, game_input *GameInput, game_offscr
 
 	if(!memory->isInitialized)
 	{
+		char *Filename = __FILE__;
+		debug_read_file_result ReadFileResult = DEBUGPlatformReadEntireFile(Filename);
+		if (ReadFileResult.Contents)
+		{
+			DEBUGPlatformFreeFileMemory(ReadFileResult.Contents);
+		}
+		
 		GameState->toneHz = 256;
 		GameState->xOffset = 0;
 		GameState->yOffset = 0;

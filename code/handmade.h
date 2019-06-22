@@ -9,21 +9,38 @@
  * 0 - No slow code allowed
  * 1 - Slow code welcome
  */
+#if HANDMADE_INTERNAL
+struct debug_read_file_result
+{
+	uint32_t ContentsSize;
+	void *Contents;
+};
+internal debug_read_file_result DEBUGPlatformReadEntireFile(char *Filename);
+internal void DEBUGPlatformFreeFileMemory(void *BitmapMemory);
+internal bool DEBUGPlatformWriteEntireFile(char *Filename, uint32_t MemorySize, void *Memory);
+#endif
 
 #if HANDMADE_SLOW
 	#define Assert(expression) if (!(expression)) { *(int *)0 = 0; }
 #else
 	#define Assert(expression)
 #endif
-#define Kilobytes(value) ((value) * 1024)
-#define Megabytes(value) (Kilobytes(value) * 1024)
-#define Gigabytes(value) (Megabytes(value) * 1024)
-#define Terabytes(value) (Gigabytes(value) * 1024)
+#define Kilobytes(value) ((value) * 1024LL)
+#define Megabytes(value) (Kilobytes(value) * 1024LL)
+#define Gigabytes(value) (Megabytes(value) * 1024LL)
+#define Terabytes(value) (Gigabytes(value) * 1024LL)
 #define ArrayCount(array) (sizeof(array) / (sizeof((array)[0])))
 
 /*
 	Services the game provides to the platform layer
 */
+
+inline uint32_t SafeTruncateUInt64(uint64_t ValueToTruncate)
+{
+	Assert(ValueToTruncate < 0xFFFFFFFF);
+	uint32_t TruncatedValue = (uint32_t)ValueToTruncate;
+	return TruncatedValue;
+}
 
 // Stuff for our RGB display buffer
 struct game_offscreen_buffer

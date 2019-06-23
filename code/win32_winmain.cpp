@@ -213,7 +213,7 @@ LRESULT CALLBACK Win32_MainWindowCallback(HWND window, UINT Message, WPARAM wPar
 		case WM_KEYDOWN:
 		case WM_KEYUP:
 		{
-			uint32_t vKCode = wParam;
+			uint32_t vKCode = (uint32_t)wParam;
 			bool wasDown = ((lParam & (1 << 30)) != 0); // Bit #30 of the LParam tells us what the previous key was
 			bool isDown = ((lParam & (1 << 30)) == 0); // Bit #31 of the LParam tells us what the current key is
 			if(wasDown != isDown)
@@ -450,11 +450,11 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 
 				// Direct sound output test
 				// Lock direct sound buffer
-				DWORD ByteToLock;
-				DWORD TargetCursor;
-				DWORD BytesToWrite;
-				DWORD PlayCursor;
-				DWORD WriteCursor;
+				DWORD ByteToLock = 0;
+				DWORD TargetCursor = 0;
+				DWORD BytesToWrite = 0;
+				DWORD PlayCursor = 0;
+				DWORD WriteCursor = 0;
 				bool soundIsValid = false;
 				if(SUCCEEDED(GlobalSoundBuffer->GetCurrentPosition(&PlayCursor, &WriteCursor)))
 				{
@@ -490,12 +490,12 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 
 				int64_t EndCycleCount = __rdtsc();
 				int64_t CyclesElapsed = EndCycleCount - LastCycleCount;
-				int32_t MegaCyclesPerFrame = CyclesElapsed / (1000 * 1000);
+				int32_t MegaCyclesPerFrame = (int32_t)(CyclesElapsed / (1000 * 1000));
 
 				LARGE_INTEGER EndCounter;
 				QueryPerformanceCounter(&EndCounter);
 				int64_t CounterElapsed = EndCounter.QuadPart - LastCounter.QuadPart;
-				int32_t msPerFrame = (1000 * CounterElapsed) / PerfCountFrequency;
+				int32_t msPerFrame = (int32_t)((1000 * CounterElapsed) / PerfCountFrequency);
 
 				char Buffer[256];
 				wsprintf(Buffer, "ms/frame: %d, mega cycles/frame: %d\n", msPerFrame, MegaCyclesPerFrame);

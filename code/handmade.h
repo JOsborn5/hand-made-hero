@@ -13,15 +13,15 @@
 struct debug_read_file_result
 {
 	uint32_t ContentsSize;
-	void *Contents;
+	void* Contents;
 };
-internal debug_read_file_result DEBUGPlatformReadEntireFile(char *Filename);
-internal void DEBUGPlatformFreeFileMemory(void *BitmapMemory);
-internal bool DEBUGPlatformWriteEntireFile(char *Filename, uint32_t MemorySize, void *Memory);
+internal debug_read_file_result DEBUGPlatformReadEntireFile(char* Filename);
+internal void DEBUGPlatformFreeFileMemory(void* BitmapMemory);
+internal bool DEBUGPlatformWriteEntireFile(char* Filename, uint32_t MemorySize, void* Memory);
 #endif
 
 #if HANDMADE_SLOW
-	#define Assert(expression) if (!(expression)) { *(int *)0 = 0; }
+	#define Assert(expression) if (!(expression)) { *(int*)0 = 0; }
 #else
 	#define Assert(expression)
 #endif
@@ -45,12 +45,12 @@ inline uint32_t SafeTruncateUInt64(uint64_t ValueToTruncate)
 // Stuff for our RGB display buffer
 struct game_offscreen_buffer
 {
-	BITMAPINFO info;
-	void* memory;
-	int width;
-	int height;
-	int pitch;
-	int bytesPerPixel = 4;
+	BITMAPINFO Info;
+	void* Memory;
+	int Width;
+	int Height;
+	int Pitch;
+	int BytesPerPixel = 4;
 };
 
 struct game_sound_output_buffer
@@ -90,7 +90,7 @@ struct game_controller_input
 
 struct game_input
 {
-	game_controller_input controllers[4];
+	game_controller_input Controllers[4];
 };
 
 struct game_state
@@ -102,14 +102,14 @@ struct game_state
 
 struct game_memory
 {
-	bool isInitialized;
-	uint64_t permanentStorageSpace;
-	uint64_t transientStorageSpace;
-	void *permanentStorage;
-	void *transientStorage;
+	bool IsInitialized;
+	uint64_t PermanentStorageSpace;
+	uint64_t TransientStorageSpace;
+	void* PermanentStorage;
+	void* TransientStorage;
 };
 
-void GameUpdateAndRender(game_memory *memory, game_input* gameInput, game_offscreen_buffer* videoBuffer, game_sound_output_buffer* soundBuffer);
+void GameUpdateAndRender(game_memory* Memory, game_input* GameInput, game_offscreen_buffer* VideoBuffer, game_sound_output_buffer* SoundBuffer);
 
 /*
 	Services the platform layer provides to the game

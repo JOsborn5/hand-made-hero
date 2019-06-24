@@ -13,11 +13,11 @@
 #include "win32_handmade.h"
 
 // Macro:
-#define DIRECT_SOUND_CREATE(name) HRESULT WINAPI name(LPCGUID pcGuidDevice, LPDIRECTSOUND *ppDS, LPUNKNOWN pUnkOuter)
+#define DIRECT_SOUND_CREATE(name) HRESULT WINAPI name(LPCGUID pcGuidDevice, LPDIRECTSOUND* ppDS, LPUNKNOWN pUnkOuter)
 // Pointer to our macro:
 typedef DIRECT_SOUND_CREATE(direct_sound_create);
 
-internal debug_read_file_result DEBUGPlatformReadEntireFile(char *FileName)
+internal debug_read_file_result DEBUGPlatformReadEntireFile(char* FileName)
 {
 	debug_read_file_result ReadFileResult = {};
 	HANDLE FileHandle = CreateFileA(FileName, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
@@ -49,7 +49,7 @@ internal debug_read_file_result DEBUGPlatformReadEntireFile(char *FileName)
 	return ReadFileResult;
 }
 
-internal void DEBUGPlatformFreeFileMemory(void *Memory)
+internal void DEBUGPlatformFreeFileMemory(void* Memory)
 {
 	if(Memory)
 	{
@@ -57,7 +57,7 @@ internal void DEBUGPlatformFreeFileMemory(void *Memory)
 	}
 }
 
-internal bool DEBUGPlatformWriteEntireFile(char *FileName, uint32_t MemorySize, void *Memory)
+internal bool DEBUGPlatformWriteEntireFile(char* FileName, uint32_t MemorySize, void* Memory)
 {
 	bool Result = false;
 	HANDLE FileHandle = CreateFileA(FileName, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
@@ -80,26 +80,26 @@ global_variable game_offscreen_buffer GlobalBackBuffer;
 global_variable LPDIRECTSOUNDBUFFER GlobalSoundBuffer;
 
 // Note this changes the buffer so we're passing the buffer as a pointer so this function will update it
-internal void Win32_ResizeDIBSection(game_offscreen_buffer *Buffer, int Width, int Height)
+internal void Win32_ResizeDIBSection(game_offscreen_buffer* Buffer, int Width, int Height)
 {
-	if(Buffer->memory)
+	if(Buffer->Memory)
 	{
-		VirtualFree(Buffer->memory, 0, MEM_RELEASE);
+		VirtualFree(Buffer->Memory, 0, MEM_RELEASE);
 	}
 
-	Buffer->width = Width;
-	Buffer->height = Height;
+	Buffer->Width = Width;
+	Buffer->Height = Height;
 
-	Buffer->info.bmiHeader.biSize = sizeof(Buffer->info.bmiHeader);
-	Buffer->info.bmiHeader.biWidth = Buffer->width;
-	Buffer->info.bmiHeader.biHeight = -Buffer->height;
-	Buffer->info.bmiHeader.biPlanes = 1;
-	Buffer->info.bmiHeader.biBitCount = 32;
-	Buffer->info.bmiHeader.biCompression = BI_RGB;
+	Buffer->Info.bmiHeader.biSize = sizeof(Buffer->Info.bmiHeader);
+	Buffer->Info.bmiHeader.biWidth = Buffer->Width;
+	Buffer->Info.bmiHeader.biHeight = -Buffer->Height;
+	Buffer->Info.bmiHeader.biPlanes = 1;
+	Buffer->Info.bmiHeader.biBitCount = 32;
+	Buffer->Info.bmiHeader.biCompression = BI_RGB;
 
-	int BitmapMemorySize = (Buffer->width * Buffer->height) * Buffer->bytesPerPixel;
-	Buffer->pitch = Buffer->width * Buffer->bytesPerPixel;
-	Buffer->memory = VirtualAlloc(0, BitmapMemorySize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+	int BitmapMemorySize = (Buffer->Width * Buffer->Height) * Buffer->BytesPerPixel;
+	Buffer->Pitch = Buffer->Width * Buffer->BytesPerPixel;
+	Buffer->Memory = VirtualAlloc(0, BitmapMemorySize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 }
 
 internal void Win32_InitDirectSound(HWND window, int32_t samplesPerSecond, int32_t bufferSize)
@@ -109,7 +109,7 @@ internal void Win32_InitDirectSound(HWND window, int32_t samplesPerSecond, int32
 
 	if(DirectSoundLibrary)
 	{
-		direct_sound_create *DirectSoundCreate = (direct_sound_create *)GetProcAddress(DirectSoundLibrary, "DirectSoundCreate");
+		direct_sound_create* DirectSoundCreate = (direct_sound_create*)GetProcAddress(DirectSoundLibrary, "DirectSoundCreate");
 
 		LPDIRECTSOUND DirectSound;
 		if(DirectSoundCreate && SUCCEEDED(DirectSoundCreate(0, &DirectSound, 0)))
@@ -179,13 +179,13 @@ win32_window_dimension Win32_GetWindowDimension(HWND Window)
 	return WindowDim;
 }
 
-internal void Win32_DisplayBufferInWindow(HDC DeviceContext, int Width, int Height, game_offscreen_buffer *Buffer)
+internal void Win32_DisplayBufferInWindow(HDC DeviceContext, int Width, int Height, game_offscreen_buffer* Buffer)
 {
 	StretchDIBits(DeviceContext,
 		0, 0, Width, Height,
-		0, 0, Buffer->width, Buffer->height,
-		Buffer->memory,
-		&Buffer->info,
+		0, 0, Buffer->Width, Buffer->Height,
+		Buffer->Memory,
+		&Buffer->Info,
 		DIB_RGB_COLORS,
 		SRCCOPY);
 }
@@ -263,11 +263,11 @@ LRESULT CALLBACK Win32_MainWindowCallback(HWND window, UINT Message, WPARAM wPar
 	return Result;
 }
 
-void Win32ClearBuffer(win32_sound_output *SoundOutput)
+void Win32ClearBuffer(win32_sound_output* SoundOutput)
 {
-	VOID *Region1;
+	VOID* Region1;
 	DWORD Region1Size;
-	VOID *Region2;
+	VOID* Region2;
 	DWORD Region2Size;
 
 	HRESULT gotLock = SUCCEEDED(GlobalSoundBuffer->Lock(
@@ -279,7 +279,7 @@ void Win32ClearBuffer(win32_sound_output *SoundOutput)
 	));
 	if(gotLock)
 	{
-		uint8_t *DestSample = (uint8_t *)Region1;
+		uint8_t* DestSample = (uint8_t*)Region1;
 		for(DWORD ByteIndex = 0;
 			ByteIndex < Region1Size;
 			++ByteIndex)
@@ -287,7 +287,7 @@ void Win32ClearBuffer(win32_sound_output *SoundOutput)
 			*DestSample++ = 0;
 		}
 
-		DestSample = (uint8_t *)Region2;
+		DestSample = (uint8_t*)Region2;
 		for(DWORD ByteIndex = 0;
 			ByteIndex < Region2Size;
 			++ByteIndex)
@@ -299,11 +299,11 @@ void Win32ClearBuffer(win32_sound_output *SoundOutput)
 	}
 }
 
-void Win32FillSoundBuffer(win32_sound_output *SoundOutput, DWORD ByteToLock, DWORD BytesToWrite, game_sound_output_buffer *SourceBuffer)
+void Win32FillSoundBuffer(win32_sound_output* SoundOutput, DWORD ByteToLock, DWORD BytesToWrite, game_sound_output_buffer* SourceBuffer)
 {
-	VOID *Region1;
+	VOID* Region1;
 	DWORD Region1Size;
-	VOID *Region2;
+	VOID* Region2;
 	DWORD Region2Size;
 
 	HRESULT gotLock = SUCCEEDED(GlobalSoundBuffer->Lock(
@@ -317,8 +317,8 @@ void Win32FillSoundBuffer(win32_sound_output *SoundOutput, DWORD ByteToLock, DWO
 	{
 		// TODO: Assert Region1Size is valid
 		DWORD Region1SampleCount = Region1Size / SoundOutput->bytesPerSample;
-		int16_t *DestSample = (int16_t *)Region1;
-		int16_t *SourceSample = SourceBuffer->samples;
+		int16_t* DestSample = (int16_t*)Region1;
+		int16_t* SourceSample = SourceBuffer->samples;
 		for(DWORD SampleIndex = 0;
 			SampleIndex < Region1SampleCount;
 			++SampleIndex)
@@ -329,7 +329,7 @@ void Win32FillSoundBuffer(win32_sound_output *SoundOutput, DWORD ByteToLock, DWO
 		}
 
 		DWORD Region2SampleCount = Region2Size / SoundOutput->bytesPerSample;
-		DestSample = (int16_t *)Region2;
+		DestSample = (int16_t*)Region2;
 		for(DWORD SampleIndex = 0;
 			SampleIndex < Region2SampleCount;
 			++SampleIndex)
@@ -401,7 +401,7 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 			int64_t LastCycleCount = __rdtsc();
 
 			bool SuccessfulMemoryAllocation = true;
-			int16_t *samples = (int16_t *)VirtualAlloc(0, SoundOutput.soundBufferSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+			int16_t* samples = (int16_t*)VirtualAlloc(0, SoundOutput.soundBufferSize, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 			if(samples == NULL)
 			{
 				SuccessfulMemoryAllocation = false;
@@ -414,18 +414,18 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 			LPVOID BaseAddress = 0;
 #endif
 			game_memory GameMemory = {};
-			GameMemory.permanentStorageSpace = Megabytes(64);
-			GameMemory.transientStorageSpace = Gigabytes((uint64_t)4);
+			GameMemory.PermanentStorageSpace = Megabytes(64);
+			GameMemory.TransientStorageSpace = Gigabytes((uint64_t)4);
 
-			uint64_t TotalStorageSpace = GameMemory.permanentStorageSpace + GameMemory.transientStorageSpace;
-			GameMemory.permanentStorage = VirtualAlloc(BaseAddress, TotalStorageSpace, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-			if(GameMemory.permanentStorage == NULL)
+			uint64_t TotalStorageSpace = GameMemory.PermanentStorageSpace + GameMemory.TransientStorageSpace;
+			GameMemory.PermanentStorage = VirtualAlloc(BaseAddress, TotalStorageSpace, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+			if(GameMemory.PermanentStorage == NULL)
 			{
 				SuccessfulMemoryAllocation = false;
 				DisplayLastWin32Error();
 			}
 
-			GameMemory.transientStorage = (uint8_t *)GameMemory.permanentStorage + GameMemory.permanentStorageSpace;
+			GameMemory.TransientStorage = (uint8_t*)GameMemory.PermanentStorage + GameMemory.PermanentStorageSpace;
 
 			game_sound_output_buffer soundBuffer = {};
 			soundBuffer.samplesPerSecond = SoundOutput.samplesPerSecond;

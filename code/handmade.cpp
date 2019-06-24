@@ -1,12 +1,12 @@
 #include "handmade.h"
 
-static void RenderWeirdGradient(game_offscreen_buffer *buffer, int xOffsetVal, int yOffsetVal)
+static void RenderWeirdGradient(game_offscreen_buffer* Buffer, int xOffsetVal, int yOffsetVal)
 {
-	uint8_t *row = (uint8_t *)buffer->memory;
-	for(int Y = 0; Y < buffer->height; Y++)
+	uint8_t* Row = (uint8_t*)Buffer->Memory;
+	for(int Y = 0; Y < Buffer->Height; Y++)
 	{
-		uint8_t *pixel = (uint8_t *)row;
-		for(int X = 0; X < buffer->width; X++)
+		uint8_t* Pixel = (uint8_t*)Row;
+		for(int X = 0; X < Buffer->Width; X++)
 		{
 			/*
 				pixel in memory: BB GG RR xx
@@ -15,57 +15,57 @@ static void RenderWeirdGradient(game_offscreen_buffer *buffer, int xOffsetVal, i
 			*/
 			
 			//BLUE
-			*pixel = (uint8_t)(X + xOffsetVal); // using * because we're writing to the memory location stored in the pixel variable
-			pixel++; // not using * because we're moving the pointer (working out where the memory location is for the next pixel)
+			*Pixel = (uint8_t)(X + xOffsetVal); // using * because we're writing to the memory location stored in the pixel variable
+			Pixel++; // not using * because we're moving the pointer (working out where the memory location is for the next pixel)
 
 			//GREEN
-			*pixel = (uint8_t)(Y - yOffsetVal);
-			pixel++;
+			*Pixel = (uint8_t)(Y - yOffsetVal);
+			Pixel++;
 
 			//RED
-			*pixel = (uint8_t)(buffer->width - X + xOffsetVal);
-			pixel++;
+			*Pixel = (uint8_t)(Buffer->Width - X + xOffsetVal);
+			Pixel++;
 
 			// PADDING BYTE
-			*pixel = 0;
-			pixel++;
+			*Pixel = 0;
+			Pixel++;
 			
 		}
-		row += buffer->pitch;
+		Row += Buffer->Pitch;
 	}
 }
 
 
-static void GameOutputSound(game_sound_output_buffer *SoundOutput)
+static void GameOutputSound(game_sound_output_buffer* SoundOutput)
 {
 	static float tSine;
-	int16_t toneVolume = 3000;
+	int16_t ToneVolume = 3000;
 	int ToneHz = 256;
 	int WavePeriod = SoundOutput->samplesPerSecond / ToneHz;
 
-	int16_t *sampleOut = SoundOutput->samples;
-	for(int sampleIndex = 0;
-		sampleIndex < SoundOutput->sampleCount;
-		++sampleIndex)
+	int16_t* SampleOut = SoundOutput->samples;
+	for(int SampleIndex = 0;
+		SampleIndex < SoundOutput->sampleCount;
+		++SampleIndex)
 	{
-		float sineValue = sinf(tSine);
-		int16_t sampleValue = (int16_t)(sineValue * toneVolume);
-		*sampleOut++ = sampleValue; // writes the sampleValue to the buffer
-		*sampleOut++ = sampleValue;
+		float SineValue = sinf(tSine);
+		int16_t SampleValue = (int16_t)(SineValue * ToneVolume);
+		*SampleOut++ = SampleValue; // writes the sampleValue to the buffer
+		*SampleOut++ = SampleValue;
 
 		tSine += 2.0f * Pi32 * 1.0f/(float)WavePeriod;
 	}
 }
 
-void GameUpdateAndRender(game_memory *memory, game_input *GameInput, game_offscreen_buffer *VideoBuffer, game_sound_output_buffer *SoundBuffer)
+void GameUpdateAndRender(game_memory* Memory, game_input* GameInput, game_offscreen_buffer* VideoBuffer, game_sound_output_buffer* SoundBuffer)
 {
-	Assert(sizeof(game_state) <= (memory->permanentStorageSpace));
+	Assert(sizeof(game_state) <= (Memory->PermanentStorageSpace));
 
-	game_state *GameState = (game_state *)memory->permanentStorage;
+	game_state* GameState = (game_state*)Memory->PermanentStorage;
 
-	if(!memory->isInitialized)
+	if(!Memory->IsInitialized)
 	{
-		char *Filename = __FILE__;
+		char* Filename = __FILE__;
 		debug_read_file_result ReadFileResult = DEBUGPlatformReadEntireFile(Filename);
 		if (ReadFileResult.Contents)
 		{
@@ -76,10 +76,10 @@ void GameUpdateAndRender(game_memory *memory, game_input *GameInput, game_offscr
 		GameState->toneHz = 256;
 		GameState->xOffset = 0;
 		GameState->yOffset = 0;
-		memory->isInitialized = true;
+		Memory->IsInitialized = true;
 	}
 
-	game_controller_input *input0 = &GameInput->controllers[0];
+	game_controller_input* input0 = &GameInput->Controllers[0];
 
 	if(input0->isAnalogue)
 	{

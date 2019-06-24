@@ -62,30 +62,39 @@ struct game_sound_output_buffer
 
 struct game_button_state
 {
-	int halfTransitionCount;
-	int endedDown;
+	int HalfTransitionCount;
+	int EndedDown;
 };
 
 struct game_controller_input
 {
-	bool isAnalogue;
+	bool IsAnalogue;
 
-	float startX;
-	float startY;
+	float StartX;
+	float StartY;
 
-	float minX;
-	float minY;
+	float MinX;
+	float MinY;
 
-	float maxX;
-	float maxY;
+	float MaxX;
+	float MaxY;
 
-	float endX;
-	float endY;
+	float EndX;
+	float EndY;
 
-	game_button_state up;
-	game_button_state down;
-	game_button_state left;
-	game_button_state right;
+	union
+	{
+		game_button_state Button[6];
+		struct
+		{
+			game_button_state Up;
+			game_button_state Down;
+			game_button_state Left;
+			game_button_state Right;
+			game_button_state LeftShoulder;
+			game_button_state RightShoulder;
+		};
+	};
 };
 
 struct game_input

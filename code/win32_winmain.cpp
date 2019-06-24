@@ -213,6 +213,7 @@ LRESULT CALLBACK Win32_MainWindowCallback(HWND window, UINT Message, WPARAM wPar
 		case WM_KEYDOWN:
 		case WM_KEYUP:
 		{
+			Assert(!"NOOOOOOOO");
 			uint32_t vKCode = (uint32_t)wParam;
 			bool wasDown = ((lParam & (1 << 30)) != 0); // Bit #30 of the LParam tells us what the previous key was
 			bool isDown = ((lParam & (1 << 30)) == 0); // Bit #31 of the LParam tells us what the current key is
@@ -343,6 +344,12 @@ void Win32FillSoundBuffer(win32_sound_output* SoundOutput, DWORD ByteToLock, DWO
 	}
 }
 
+void Win32ProcessKeyboardMessage(game_button_state* State, bool IsDown)
+{
+	State->EndedDown = IsDown;
+	++State->HalfTransitionCount;
+}
+
 void DisplayLastWin32Error()
 {
 	DWORD ErrorCode = GetLastError();
@@ -397,7 +404,6 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 
 			LARGE_INTEGER LastCounter;
 			QueryPerformanceCounter(&LastCounter);
-
 			int64_t LastCycleCount = __rdtsc();
 
 			bool SuccessfulMemoryAllocation = true;
@@ -418,7 +424,7 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 			GameMemory.TransientStorageSpace = Gigabytes((uint64_t)4);
 
 			uint64_t TotalStorageSpace = GameMemory.PermanentStorageSpace + GameMemory.TransientStorageSpace;
-			GameMemory.PermanentStorage = VirtualAlloc(BaseAddress, TotalStorageSpace, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
+			GameMemory.PermanentStorage = VirtualAlloc(BaseAddress, (size_t)TotalStorageSpace, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 			if(GameMemory.PermanentStorage == NULL)
 			{
 				SuccessfulMemoryAllocation = false;
@@ -431,11 +437,15 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 			soundBuffer.samplesPerSecond = SoundOutput.samplesPerSecond;
 			soundBuffer.samples = samples;
 
+			game_input GameInput = {};
+
 			while(SuccessfulMemoryAllocation && IsRunning)
 			{
 				MSG Message;
 
-				game_input GameInput = {};
+				game_controller_input* KeyboardController = &GameInput.Controllers[0];
+				game_controller_input ZeroController = {};
+				*KeyboardController = ZeroController;
 
 				// flush the queue of Messages from windows in this loop
 				while(PeekMessage(&Message, 0, 0, 0, PM_REMOVE))
@@ -444,8 +454,53 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 					{
 						IsRunning = false;
 					}
-					TranslateMessage(&Message);
-					DispatchMessage(&Message);
+
+					switch(Message.message)
+					{
+						case WM_SYSKEYDOWN:
+						case WM_SYSKEYUP:
+						case WM_KEYDOWN:
+						case WM_KEYUP:
+						{
+							uint32_t VKCode = (uint32_t)Message.wParam;
+							bool WasDown = ((Message.lParam & (1 << 30)) != 0); // Bit #30 of the LParam tells us what the previous key was
+							bool IsDown = ((Message.lParam & (1 << 30)) == 0); // Bit #31 of the LParam tells us what the current key is
+							if(WasDown != IsDown)
+							{
+								if(VKCode == VK_UP)
+								{
+									Win32ProcessKeyboardMessage(&KeyboardController->Up, IsDown);
+								}
+								else if (VKCode == VK_DOWN)
+								{
+								}
+								else if (VKCode == VK_LEFT)
+								{
+								}
+								else if (VKCode == VK_RIGHT)
+								{
+								}
+								else if (VKCode == VK_ESCAPE)
+								{
+								}
+								else if (VKCode == VK_SPACE)
+								{
+
+								}
+							}
+
+							bool AltKeyDown = ((Message.lParam & (1 << 29)) != 0);
+							if((VKCode == VK_F4) && AltKeyDown)
+							{
+								IsRunning = false;
+							}
+						} break;
+						default: {
+							TranslateMessage(&Message);
+							DispatchMessage(&Message);
+						} break;
+
+					}
 				}
 
 				// Direct sound output test

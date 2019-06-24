@@ -81,14 +81,14 @@ void GameUpdateAndRender(game_memory* Memory, game_input* GameInput, game_offscr
 
 	game_controller_input* input0 = &GameInput->Controllers[0];
 
-	if(input0->isAnalogue)
+	if(input0->IsAnalogue)
 	{
 
 	}
 	else
 	{
-		GameState->toneHz = 256 + (int)(128.0f * input0->endX);
-		GameState->yOffset = (int)(4.0f * input0->endY);
+		GameState->toneHz = 256 + (int)(128.0f * input0->EndX);
+		GameState->yOffset = (int)(4.0f * input0->EndY);
 	}
 
 	GameOutputSound(SoundBuffer);

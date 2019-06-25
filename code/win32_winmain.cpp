@@ -214,37 +214,6 @@ LRESULT CALLBACK Win32_MainWindowCallback(HWND window, UINT Message, WPARAM wPar
 		case WM_KEYUP:
 		{
 			Assert(!"NOOOOOOOO");
-			uint32_t vKCode = (uint32_t)wParam;
-			bool wasDown = ((lParam & (1 << 30)) != 0); // Bit #30 of the LParam tells us what the previous key was
-			bool isDown = ((lParam & (1 << 30)) == 0); // Bit #31 of the LParam tells us what the current key is
-			if(wasDown != isDown)
-			{
-				if(vKCode == VK_UP)
-				{
-				}
-				else if (vKCode == VK_DOWN)
-				{
-				}
-				else if (vKCode == VK_LEFT)
-				{
-				}
-				else if (vKCode == VK_RIGHT)
-				{
-				}
-				else if (vKCode == VK_ESCAPE)
-				{
-				}
-				else if (vKCode == VK_SPACE)
-				{
-
-				}
-			}
-
-			bool altKeyDown = ((lParam & (1 << 29)) != 0);
-			if((vKCode == VK_F4) && altKeyDown)
-			{
-				IsRunning = false;
-			}
 		} break;
 		case WM_PAINT:
 		{
@@ -347,6 +316,7 @@ internal void Win32FillSoundBuffer(win32_sound_output* SoundOutput, DWORD ByteTo
 
 internal void Win32ProcessKeyboardMessage(game_button_state* State, bool IsDown)
 {
+	Assert(State->EndedDown != (int)IsDown);
 	State->EndedDown = IsDown;
 	++State->HalfTransitionCount;
 }
@@ -371,7 +341,7 @@ internal void Win32ProcessPendingMessages(game_controller_input* KeyboardControl
 			{
 				uint32_t VKCode = (uint32_t)Message.wParam;
 				bool WasDown = ((Message.lParam & (1 << 30)) != 0); // Bit #30 of the LParam tells us what the previous key was
-				bool IsDown = ((Message.lParam & (1 << 30)) == 0); // Bit #31 of the LParam tells us what the current key is
+				bool IsDown = ((Message.lParam & (1 << 31)) == 0); // Bit #31 of the LParam tells us what the current key is
 				if(WasDown != IsDown)
 				{
 					if(VKCode == VK_UP)
@@ -380,12 +350,15 @@ internal void Win32ProcessPendingMessages(game_controller_input* KeyboardControl
 					}
 					else if (VKCode == VK_DOWN)
 					{
+						Win32ProcessKeyboardMessage(&KeyboardController->Down, IsDown);
 					}
 					else if (VKCode == VK_LEFT)
 					{
+						Win32ProcessKeyboardMessage(&KeyboardController->Left, IsDown);
 					}
-					else if (VKCode == VK_RIGHT)
+					else if (VKCode == VK_RIGHT || VKCode == 'd')
 					{
+						Win32ProcessKeyboardMessage(&KeyboardController->Right, IsDown);
 					}
 					else if (VKCode == VK_ESCAPE)
 					{
@@ -498,15 +471,26 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 			soundBuffer.samplesPerSecond = SoundOutput.samplesPerSecond;
 			soundBuffer.samples = samples;
 
-			game_input GameInput = {};
+			game_input Input[2] = {};
+			game_input* NewController = &Input[0];
+			game_input* OldController = &Input[1];
 
 			while(SuccessfulMemoryAllocation && IsRunning)
 			{
-				game_controller_input* KeyboardController = &GameInput.Controllers[0];
+				game_controller_input* NewKeyboardController = &NewController->Controllers[0];
+				game_controller_input* OldKeyboardController = &OldController->Controllers[0];
 				game_controller_input ZeroController = {};
-				*KeyboardController = ZeroController;
+				*NewKeyboardController = ZeroController;
+				for(int ButtonIndex = 0; ButtonIndex < ArrayCount(NewKeyboardController->Buttons); ButtonIndex++)
+				{
+					NewKeyboardController->Buttons[ButtonIndex].EndedDown = OldKeyboardController->Buttons[ButtonIndex].EndedDown;
+				}
 
-				Win32ProcessPendingMessages(KeyboardController);
+				Win32ProcessPendingMessages(NewKeyboardController);
+
+				// After processing all inputs, point the old controller at the new controller
+				// so 'new' state becomes 'old' state for the start of the next loop
+				*OldController = *NewController;
 
 				// Direct sound output test
 				// Lock direct sound buffer
@@ -536,7 +520,7 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 				}
 
 				soundBuffer.sampleCount = BytesToWrite / SoundOutput.bytesPerSample;
-				GameUpdateAndRender(&GameMemory, &GameInput, &GlobalBackBuffer, &soundBuffer);
+				GameUpdateAndRender(&GameMemory, NewController, &GlobalBackBuffer, &soundBuffer);
 
 				if(soundIsValid)
 				{

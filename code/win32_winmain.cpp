@@ -264,7 +264,7 @@ LRESULT CALLBACK Win32_MainWindowCallback(HWND window, UINT Message, WPARAM wPar
 	return Result;
 }
 
-void Win32ClearBuffer(win32_sound_output* SoundOutput)
+internal void Win32ClearBuffer(win32_sound_output* SoundOutput)
 {
 	VOID* Region1;
 	DWORD Region1Size;
@@ -300,7 +300,7 @@ void Win32ClearBuffer(win32_sound_output* SoundOutput)
 	}
 }
 
-void Win32FillSoundBuffer(win32_sound_output* SoundOutput, DWORD ByteToLock, DWORD BytesToWrite, game_sound_output_buffer* SourceBuffer)
+internal void Win32FillSoundBuffer(win32_sound_output* SoundOutput, DWORD ByteToLock, DWORD BytesToWrite, game_sound_output_buffer* SourceBuffer)
 {
 	VOID* Region1;
 	DWORD Region1Size;
@@ -344,10 +344,71 @@ void Win32FillSoundBuffer(win32_sound_output* SoundOutput, DWORD ByteToLock, DWO
 	}
 }
 
-void Win32ProcessKeyboardMessage(game_button_state* State, bool IsDown)
+
+internal void Win32ProcessKeyboardMessage(game_button_state* State, bool IsDown)
 {
 	State->EndedDown = IsDown;
 	++State->HalfTransitionCount;
+}
+
+internal void Win32ProcessPendingMessages(game_controller_input* KeyboardController)
+{
+	// flush the queue of Messages from windows in this loop
+	MSG Message;
+	while(PeekMessage(&Message, 0, 0, 0, PM_REMOVE))
+	{
+		if(Message.message == WM_QUIT)
+		{
+			IsRunning = false;
+		}
+
+		switch(Message.message)
+		{
+			case WM_SYSKEYDOWN:
+			case WM_SYSKEYUP:
+			case WM_KEYDOWN:
+			case WM_KEYUP:
+			{
+				uint32_t VKCode = (uint32_t)Message.wParam;
+				bool WasDown = ((Message.lParam & (1 << 30)) != 0); // Bit #30 of the LParam tells us what the previous key was
+				bool IsDown = ((Message.lParam & (1 << 30)) == 0); // Bit #31 of the LParam tells us what the current key is
+				if(WasDown != IsDown)
+				{
+					if(VKCode == VK_UP)
+					{
+						Win32ProcessKeyboardMessage(&KeyboardController->Up, IsDown);
+					}
+					else if (VKCode == VK_DOWN)
+					{
+					}
+					else if (VKCode == VK_LEFT)
+					{
+					}
+					else if (VKCode == VK_RIGHT)
+					{
+					}
+					else if (VKCode == VK_ESCAPE)
+					{
+					}
+					else if (VKCode == VK_SPACE)
+					{
+
+					}
+				}
+
+				bool AltKeyDown = ((Message.lParam & (1 << 29)) != 0);
+				if((VKCode == VK_F4) && AltKeyDown)
+				{
+					IsRunning = false;
+				}
+			} break;
+			default: {
+				TranslateMessage(&Message);
+				DispatchMessage(&Message);
+			} break;
+
+		}
+	}
 }
 
 void DisplayLastWin32Error()
@@ -441,67 +502,11 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 
 			while(SuccessfulMemoryAllocation && IsRunning)
 			{
-				MSG Message;
-
 				game_controller_input* KeyboardController = &GameInput.Controllers[0];
 				game_controller_input ZeroController = {};
 				*KeyboardController = ZeroController;
 
-				// flush the queue of Messages from windows in this loop
-				while(PeekMessage(&Message, 0, 0, 0, PM_REMOVE))
-				{
-					if(Message.message == WM_QUIT)
-					{
-						IsRunning = false;
-					}
-
-					switch(Message.message)
-					{
-						case WM_SYSKEYDOWN:
-						case WM_SYSKEYUP:
-						case WM_KEYDOWN:
-						case WM_KEYUP:
-						{
-							uint32_t VKCode = (uint32_t)Message.wParam;
-							bool WasDown = ((Message.lParam & (1 << 30)) != 0); // Bit #30 of the LParam tells us what the previous key was
-							bool IsDown = ((Message.lParam & (1 << 30)) == 0); // Bit #31 of the LParam tells us what the current key is
-							if(WasDown != IsDown)
-							{
-								if(VKCode == VK_UP)
-								{
-									Win32ProcessKeyboardMessage(&KeyboardController->Up, IsDown);
-								}
-								else if (VKCode == VK_DOWN)
-								{
-								}
-								else if (VKCode == VK_LEFT)
-								{
-								}
-								else if (VKCode == VK_RIGHT)
-								{
-								}
-								else if (VKCode == VK_ESCAPE)
-								{
-								}
-								else if (VKCode == VK_SPACE)
-								{
-
-								}
-							}
-
-							bool AltKeyDown = ((Message.lParam & (1 << 29)) != 0);
-							if((VKCode == VK_F4) && AltKeyDown)
-							{
-								IsRunning = false;
-							}
-						} break;
-						default: {
-							TranslateMessage(&Message);
-							DispatchMessage(&Message);
-						} break;
-
-					}
-				}
+				Win32ProcessPendingMessages(KeyboardController);
 
 				// Direct sound output test
 				// Lock direct sound buffer

@@ -356,12 +356,13 @@ internal void Win32ProcessPendingMessages(game_controller_input* KeyboardControl
 					{
 						Win32ProcessKeyboardMessage(&KeyboardController->Left, IsDown);
 					}
-					else if (VKCode == VK_RIGHT || VKCode == 'd')
+					else if (VKCode == VK_RIGHT)
 					{
 						Win32ProcessKeyboardMessage(&KeyboardController->Right, IsDown);
 					}
 					else if (VKCode == VK_ESCAPE)
 					{
+						IsRunning = false;
 					}
 					else if (VKCode == VK_SPACE)
 					{
@@ -488,10 +489,6 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 
 				Win32ProcessPendingMessages(NewKeyboardController);
 
-				// After processing all inputs, point the old controller at the new controller
-				// so 'new' state becomes 'old' state for the start of the next loop
-				*OldController = *NewController;
-
 				// Direct sound output test
 				// Lock direct sound buffer
 				DWORD ByteToLock = 0;
@@ -547,6 +544,10 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 
 				LastCounter = EndCounter;
 				LastCycleCount = EndCycleCount;
+
+				// After processing all inputs, point the old controller at the new controller
+				// so 'new' state becomes 'old' state for the start of the next loop
+				*OldController = *NewController;
 			}
 		}
 		else

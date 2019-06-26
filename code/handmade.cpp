@@ -36,11 +36,10 @@ static void RenderWeirdGradient(game_offscreen_buffer* Buffer, int xOffsetVal, i
 }
 
 
-static void GameOutputSound(game_sound_output_buffer* SoundOutput)
+static void GameOutputSound(game_sound_output_buffer* SoundOutput, int ToneHz)
 {
 	static float tSine;
 	int16_t ToneVolume = 3000;
-	int ToneHz = 256;
 	int WavePeriod = SoundOutput->samplesPerSecond / ToneHz;
 
 	int16_t* SampleOut = SoundOutput->samples;
@@ -83,14 +82,36 @@ void GameUpdateAndRender(game_memory* Memory, game_input* GameInput, game_offscr
 
 	if(input0->IsAnalogue)
 	{
-
-	}
-	else
-	{
 		GameState->toneHz = 256 + (int)(128.0f * input0->EndX);
 		GameState->yOffset = (int)(4.0f * input0->EndY);
 	}
+	else
+	{
+		if (input0->Right.EndedDown)
+		{
+			if (GameState->toneHz < 44000)
+			{
+				GameState->toneHz += 2;
+			}
+		}
+		else if (input0->Left.EndedDown)
+		{
+			if (GameState->toneHz > 5)
+			{
+				GameState->toneHz -= 2;
+			}
+		}
 
-	GameOutputSound(SoundBuffer);
+		if (input0->Up.EndedDown)
+		{
+			GameState->yOffset -= 1;	
+		}
+		else if (input0->Down.EndedDown)
+		{
+			GameState->yOffset += 1;	
+		}
+	}
+
+	GameOutputSound(SoundBuffer, GameState->toneHz);
 	RenderWeirdGradient(VideoBuffer, GameState->xOffset, GameState->yOffset);
 }

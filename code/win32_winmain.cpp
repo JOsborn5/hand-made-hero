@@ -344,29 +344,53 @@ internal void Win32ProcessPendingMessages(game_controller_input* KeyboardControl
 				bool IsDown = ((Message.lParam & (1 << 31)) == 0); // Bit #31 of the LParam tells us what the current key is
 				if(WasDown != IsDown)
 				{
-					if(VKCode == VK_UP)
+					if(VKCode == 'W')
 					{
-						Win32ProcessKeyboardMessage(&KeyboardController->Up, IsDown);
+						Win32ProcessKeyboardMessage(&KeyboardController->MoveUp, IsDown);
+					}
+					else if(VKCode == 'S')
+					{
+						Win32ProcessKeyboardMessage(&KeyboardController->MoveDown, IsDown);
+					}
+					else if(VKCode == 'A')
+					{
+						Win32ProcessKeyboardMessage(&KeyboardController->MoveLeft, IsDown);
+					}
+					else if(VKCode == 'D')
+					{
+						Win32ProcessKeyboardMessage(&KeyboardController->MoveRight, IsDown);
+					}
+					else if(VKCode == 'Q')
+					{
+						Win32ProcessKeyboardMessage(&KeyboardController->LeftShoulder, IsDown);
+					}
+					else if(VKCode == 'E')
+					{
+						Win32ProcessKeyboardMessage(&KeyboardController->RightShoulder, IsDown);
+					}
+					else if(VKCode == VK_UP)
+					{
+						Win32ProcessKeyboardMessage(&KeyboardController->ActionUp, IsDown);
 					}
 					else if (VKCode == VK_DOWN)
 					{
-						Win32ProcessKeyboardMessage(&KeyboardController->Down, IsDown);
+						Win32ProcessKeyboardMessage(&KeyboardController->ActionDown, IsDown);
 					}
 					else if (VKCode == VK_LEFT)
 					{
-						Win32ProcessKeyboardMessage(&KeyboardController->Left, IsDown);
+						Win32ProcessKeyboardMessage(&KeyboardController->ActionLeft, IsDown);
 					}
 					else if (VKCode == VK_RIGHT)
 					{
-						Win32ProcessKeyboardMessage(&KeyboardController->Right, IsDown);
+						Win32ProcessKeyboardMessage(&KeyboardController->ActionRight, IsDown);
 					}
 					else if (VKCode == VK_ESCAPE)
 					{
-						IsRunning = false;
+						Win32ProcessKeyboardMessage(&KeyboardController->Back, IsDown);
 					}
 					else if (VKCode == VK_SPACE)
 					{
-
+						Win32ProcessKeyboardMessage(&KeyboardController->Start, IsDown);
 					}
 				}
 
@@ -478,10 +502,9 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 
 			while(SuccessfulMemoryAllocation && IsRunning)
 			{
-				game_controller_input* NewKeyboardController = &NewController->Controllers[0];
-				game_controller_input* OldKeyboardController = &OldController->Controllers[0];
-				game_controller_input ZeroController = {};
-				*NewKeyboardController = ZeroController;
+				game_controller_input* NewKeyboardController = GetGameController(NewController, 0);
+				game_controller_input* OldKeyboardController = GetGameController(OldController, 0);
+				*NewKeyboardController = {};
 				for(int ButtonIndex = 0; ButtonIndex < ArrayCount(NewKeyboardController->Buttons); ButtonIndex++)
 				{
 					NewKeyboardController->Buttons[ButtonIndex].EndedDown = OldKeyboardController->Buttons[ButtonIndex].EndedDown;

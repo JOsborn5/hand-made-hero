@@ -1,5 +1,5 @@
 @echo off
-REM https://hero.handmade.network/episode/code/day017 24:00
+REM https://hero.handmade.network/episode/code/day018
 
 SET OUTPUT_DIR=bin
 

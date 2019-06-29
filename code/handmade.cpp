@@ -78,23 +78,23 @@ void GameUpdateAndRender(game_memory* Memory, game_input* GameInput, game_offscr
 		Memory->IsInitialized = true;
 	}
 
-	game_controller_input* input0 = &GameInput->Controllers[0];
+	game_controller_input* input0 = GetGameController(GameInput, 0);
 
 	if(input0->IsAnalogue)
 	{
-		GameState->toneHz = 256 + (int)(128.0f * input0->EndX);
-		GameState->yOffset = (int)(4.0f * input0->EndY);
+		GameState->toneHz = 256 + (int)(128.0f * input0->StickAverageX);
+		GameState->yOffset = (int)(4.0f * input0->StickAverageY);
 	}
 	else
 	{
-		if (input0->Right.EndedDown)
+		if (input0->ActionRight.EndedDown)
 		{
 			if (GameState->toneHz < 44000)
 			{
 				GameState->toneHz += 2;
 			}
 		}
-		else if (input0->Left.EndedDown)
+		else if (input0->ActionLeft.EndedDown)
 		{
 			if (GameState->toneHz > 5)
 			{
@@ -102,13 +102,21 @@ void GameUpdateAndRender(game_memory* Memory, game_input* GameInput, game_offscr
 			}
 		}
 
-		if (input0->Up.EndedDown)
+		if (input0->MoveUp.EndedDown)
 		{
 			GameState->yOffset -= 1;	
 		}
-		else if (input0->Down.EndedDown)
+		else if (input0->MoveDown.EndedDown)
 		{
 			GameState->yOffset += 1;	
+		}
+		else if (input0->MoveRight.EndedDown)
+		{
+			GameState->xOffset += 1;	
+		}
+		else if (input0->MoveLeft.EndedDown)
+		{
+			GameState->xOffset -= 1;	
 		}
 	}
 

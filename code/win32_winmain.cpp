@@ -78,6 +78,7 @@ internal bool DEBUGPlatformWriteEntireFile(char* FileName, uint32_t MemorySize, 
 global_variable bool IsRunning = false;
 global_variable game_offscreen_buffer GlobalBackBuffer;
 global_variable LPDIRECTSOUNDBUFFER GlobalSoundBuffer;
+global_variable int64_t GlobalPerfCountFrequency;
 
 // Note this changes the buffer so we're passing the buffer as a pointer so this function will update it
 internal void Win32_ResizeDIBSection(game_offscreen_buffer* Buffer, int Width, int Height)
@@ -416,17 +417,40 @@ void DisplayLastWin32Error()
 	wsprintf(ErrorCodeBuffer, "VirtualAlloc error code: %d\n", ErrorCode);
 }
 
+inline LARGE_INTEGER Win32GetWallClock()
+{
+	LARGE_INTEGER Result;
+	QueryPerformanceCounter(&Result);
+	return Result;
+}
+
+inline float Win32GetSecondsElapsed(LARGE_INTEGER Start, LARGE_INTEGER End)
+{
+	uint64_t CounterElapsed = End.QuadPart - Start.QuadPart;
+	float SecondsElapsedForWork = ((float)CounterElapsed / (float)GlobalPerfCountFrequency);
+	return SecondsElapsedForWork;
+}
+
 int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLine, int showCode)
 {
 	LARGE_INTEGER PerfCounterFrequencyResult;
 	QueryPerformanceFrequency(&PerfCounterFrequencyResult);
-	int64_t PerfCountFrequency = PerfCounterFrequencyResult.QuadPart;
+	GlobalPerfCountFrequency = PerfCounterFrequencyResult.QuadPart;
+
+	// Set the Windows schedular granularity to 1ms to help our Sleep() function call be granular
+	UINT DesiredSchedulerMS = 1;
+	MMRESULT setSchedularGranularityResult = timeBeginPeriod(DesiredSchedulerMS);
+	bool SleepIsGranular = (setSchedularGranularityResult == TIMERR_NOERROR);
 
 	WNDCLASSA WindowClass = {};
 	WindowClass.style = CS_OWNDC|CS_HREDRAW|CS_VREDRAW;
 	WindowClass.lpfnWndProc = Win32_MainWindowCallback;
 	WindowClass.hInstance = instance;
 	WindowClass.lpszClassName = "Fucking A!";
+
+	int MonitorRefreshHz = 60;
+	int GameUpdateHz = MonitorRefreshHz / 2;
+	float TargetSecondsPerFrame = 1.0f / (float)GameUpdateHz;
 
 	Win32_ResizeDIBSection(&GlobalBackBuffer, 1200, 700);
 
@@ -461,8 +485,7 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 			Win32ClearBuffer(&SoundOutput);
 			GlobalSoundBuffer->Play(0, 0, DSBPLAY_LOOPING);
 
-			LARGE_INTEGER LastCounter;
-			QueryPerformanceCounter(&LastCounter);
+			LARGE_INTEGER LastCounter = Win32GetWallClock();
 			int64_t LastCycleCount = __rdtsc();
 
 			bool SuccessfulMemoryAllocation = true;
@@ -547,30 +570,53 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 					Win32FillSoundBuffer(&SoundOutput, ByteToLock, BytesToWrite, &soundBuffer);
 				}
 
+				LARGE_INTEGER WorkCounter = Win32GetWallClock();
+				float WorkSecondsElapsed = Win32GetSecondsElapsed(LastCounter, WorkCounter);
+				float SecondsElapsedForFrame = WorkSecondsElapsed;
+				if(SecondsElapsedForFrame < TargetSecondsPerFrame)
+				{
+					while(SecondsElapsedForFrame < TargetSecondsPerFrame)
+					{
+						if(SleepIsGranular)
+						{
+							DWORD SleepMS = (DWORD)(1000 * (TargetSecondsPerFrame - SecondsElapsedForFrame));
+							Sleep(SleepMS);
+						}
+						LARGE_INTEGER CheckCounter = Win32GetWallClock();
+						SecondsElapsedForFrame = Win32GetSecondsElapsed(LastCounter, CheckCounter);
+					}
+				}
+				else
+				{
+					// TODO MISSED FRAME RATE
+				}
+
 				win32_window_dimension WindowSize = Win32_GetWindowDimension(window);
 				HDC DeviceContext = GetDC(window);
 				Win32_DisplayBufferInWindow(DeviceContext, WindowSize.width, WindowSize.height, &GlobalBackBuffer);
 				ReleaseDC(window, DeviceContext);
 
-				int64_t EndCycleCount = __rdtsc();
-				int64_t CyclesElapsed = EndCycleCount - LastCycleCount;
-				int32_t MegaCyclesPerFrame = (int32_t)(CyclesElapsed / (1000 * 1000));
-
-				LARGE_INTEGER EndCounter;
-				QueryPerformanceCounter(&EndCounter);
-				int64_t CounterElapsed = EndCounter.QuadPart - LastCounter.QuadPart;
-				int32_t msPerFrame = (int32_t)((1000 * CounterElapsed) / PerfCountFrequency);
-
-				char Buffer[256];
-				wsprintf(Buffer, "ms/frame: %d, mega cycles/frame: %d\n", msPerFrame, MegaCyclesPerFrame);
-				OutputDebugStringA(Buffer);
-
-				LastCounter = EndCounter;
-				LastCycleCount = EndCycleCount;
-
 				// After processing all inputs, point the old controller at the new controller
 				// so 'new' state becomes 'old' state for the start of the next loop
-				*OldController = *NewController;
+				game_input* Temp = NewController;
+				NewController = OldController;
+				OldController = Temp;
+
+				LARGE_INTEGER EndCounter = Win32GetWallClock();
+				float MSPerFrame = 1000.0f * Win32GetSecondsElapsed(LastCounter, EndCounter);
+				uint64_t CounterElapsed = LastCounter.QuadPart - EndCounter.QuadPart;
+				LastCounter = EndCounter;
+
+				int64_t EndCycleCount = __rdtsc();
+				int64_t CyclesElapsed = EndCycleCount - LastCycleCount;
+				LastCycleCount = EndCycleCount;
+
+				double FPS = (double)GlobalPerfCountFrequency / (double)(CounterElapsed);
+				double MCPF = (double)CyclesElapsed / (1000.0f * 1000.0f);
+
+				char Buffer[256];
+				wsprintf(Buffer, "%.02fms/f,  %.02ff/s,  %.02fMC/f\n", MSPerFrame, FPS, MCPF);
+				OutputDebugStringA(Buffer);
 			}
 		}
 		else

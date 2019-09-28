@@ -145,7 +145,7 @@ internal void Win32_InitDirectSound(HWND window, int32_t samplesPerSecond, int32
 
 			DSBUFFERDESC BufferDescription = {};
 			BufferDescription.dwSize = sizeof(BufferDescription);
-			BufferDescription.dwFlags = 0;
+			BufferDescription.dwFlags = DSBCAPS_GETCURRENTPOSITION2;;
 			BufferDescription.dwBufferBytes = bufferSize;
 			BufferDescription.lpwfxFormat = &WaveFormat;
 			
@@ -441,7 +441,15 @@ internal void Win32DebugDrawVertical(game_offscreen_buffer* VideoBuffer, int X, 
 	}
 }
 
-internal void Win32DebugSyncDisplay(game_offscreen_buffer* VideoBuffer, int PlayCursorArrayCount, DWORD* LastPlayCursor, win32_sound_output* SoundOutput, float SecondsPerFrame)
+inline void Win32DrawSoundBufferMarker(game_offscreen_buffer* VideoBuffer, win32_sound_output* SoundOutput, DWORD Cursor, uint32_t Color, float C, int PadX, int Top, int Bottom)
+{
+	Assert(Cursor < (DWORD)SoundOutput->soundBufferSize);
+	float XReal32 = C * Cursor;
+	int X = PadX + (int)XReal32;
+	Win32DebugDrawVertical(VideoBuffer, X, Top, Bottom, Color);
+}
+
+internal void Win32DebugSyncDisplay(game_offscreen_buffer* VideoBuffer, int MarkerCount, win32_debug_time_marker* Marker, win32_sound_output* SoundOutput, float SecondsPerFrame)
 {
 	int PadX = 16;
 	int PadY = 16;
@@ -449,13 +457,12 @@ internal void Win32DebugSyncDisplay(game_offscreen_buffer* VideoBuffer, int Play
 	int Bottom = VideoBuffer->Height - PadY;
 
 	float C = (float)(VideoBuffer->Width - (2 * PadX)) / (float)SoundOutput->soundBufferSize;
-	for(int PlayCursorIndex = 0; PlayCursorIndex < PlayCursorArrayCount; PlayCursorIndex++)
+	for(int MarkerIndex = 0; MarkerIndex < MarkerCount; MarkerIndex++)
 	{
-		DWORD ThisPlayCursor = LastPlayCursor[PlayCursorIndex];
-		Assert(ThisPlayCursor < (DWORD)SoundOutput->soundBufferSize);
-		float XReal32 = (C * ThisPlayCursor);
-		int X = PadX + (int)XReal32;
-		Win32DebugDrawVertical(VideoBuffer, X, Top, Bottom, 0xFFFFFFFF);
+		win32_debug_time_marker* ThisMarker = &Marker[MarkerIndex];
+
+		Win32DrawSoundBufferMarker(VideoBuffer, SoundOutput, ThisMarker->PlayCursor, 0xFFFFFFFF, C, PadX, Top, Bottom);
+		Win32DrawSoundBufferMarker(VideoBuffer, SoundOutput, ThisMarker->WriteCursor, 0xFFFF0000, C, PadX, Top, Bottom);
 	}
 }
 
@@ -470,11 +477,11 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 	MMRESULT setSchedularGranularityResult = timeBeginPeriod(DesiredSchedulerMS);
 	bool SleepIsGranular = (setSchedularGranularityResult == TIMERR_NOERROR);
 
-	WNDCLASSA WindowClass = {};
-	WindowClass.style = CS_OWNDC|CS_HREDRAW|CS_VREDRAW;
-	WindowClass.lpfnWndProc = Win32_MainWindowCallback;
-	WindowClass.hInstance = instance;
-	WindowClass.lpszClassName = "Fucking A!";
+	WNDCLASSA windowClass = {};
+	windowClass.style = CS_OWNDC|CS_HREDRAW|CS_VREDRAW;
+	windowClass.lpfnWndProc = Win32_MainWindowCallback;
+	windowClass.hInstance = instance;
+	windowClass.lpszClassName = "Fucking A!";
 
 	const int MonitorRefreshHz = 60;
 	const int GameUpdateHz = 30;
@@ -483,11 +490,11 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 
 	Win32_ResizeDIBSection(&GlobalBackBuffer, 1200, 700);
 
-	if(RegisterClass(&WindowClass))
+	if(RegisterClass(&windowClass))
 	{
 		HWND window = CreateWindowEx(
 								0,
-								WindowClass.lpszClassName,
+								windowClass.lpszClassName,
 								"Fucking AAA!",
 								WS_OVERLAPPEDWINDOW|WS_VISIBLE,
 								CW_USEDEFAULT,
@@ -516,8 +523,8 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 
 			LARGE_INTEGER LastCounter = Win32GetWallClock();
 
-			int DebugLastPlayCursorIndex = 0;
-			DWORD DebugLastPlayCursor[GameUpdateHz / 2] = {0};
+			int DebugLastMarkerIndex = 0;
+			win32_debug_time_marker DebugTimeMarkers[GameUpdateHz / 2] = {0};
 
 			int64_t LastCycleCount = __rdtsc();
 
@@ -634,7 +641,8 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 				win32_window_dimension WindowSize = Win32_GetWindowDimension(window);
 				HDC DeviceContext = GetDC(window);
 #if HANDMADE_INTERNAL
-				Win32DebugSyncDisplay(&GlobalBackBuffer, ArrayCount(DebugLastPlayCursor), DebugLastPlayCursor, &SoundOutput, TargetSecondsPerFrame);
+				win32_debug_time_marker* DebugTimeMarker = &DebugTimeMarkers[DebugLastMarkerIndex];
+				Win32DebugSyncDisplay(&GlobalBackBuffer, ArrayCount(DebugTimeMarkers), DebugTimeMarker, &SoundOutput, TargetSecondsPerFrame);
 #endif
 				Win32_DisplayBufferInWindow(DeviceContext, WindowSize.width, WindowSize.height, &GlobalBackBuffer);
 
@@ -642,14 +650,13 @@ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE prevInstance, LPSTR commandLi
 
 #if HANDMADE_INTERNAL
 				{
-					DWORD DebugPlayCursor;
-					DWORD DebugWriteCursor;
-					GlobalSoundBuffer->GetCurrentPosition(&DebugPlayCursor, &DebugWriteCursor);
-					DebugLastPlayCursor[DebugLastPlayCursorIndex++] = DebugPlayCursor;
-					if(DebugLastPlayCursorIndex > ArrayCount(DebugLastPlayCursor))
+					win32_debug_time_marker* Marker = &DebugTimeMarkers[DebugLastMarkerIndex++];
+					if(DebugLastMarkerIndex > ArrayCount(DebugTimeMarkers))
 					{
-						DebugLastPlayCursorIndex = 0;
+						DebugLastMarkerIndex = 0;
 					}
+
+					GlobalSoundBuffer->GetCurrentPosition(&Marker->PlayCursor, &Marker->WriteCursor);
 				}
 #endif
 

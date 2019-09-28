@@ -5,6 +5,12 @@ struct win32_window_dimension
 	int height;
 };
 
+struct win32_debug_time_marker
+{
+	DWORD PlayCursor;
+	DWORD WriteCursor;
+};
+
 struct win32_sound_output
 {
 	int samplesPerSecond;
